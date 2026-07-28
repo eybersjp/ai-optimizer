@@ -1,0 +1,28 @@
+id: design-taste
+version: 1.0.0
+name: Anti-Slop Design Taste
+description: Anti-slop frontend engineering & design framework preventing generic AI templates, enforcing intentional typography, visual hierarchy, responsive layout variance, and anti-default discipline.
+
+activation:
+  any:
+    - dependency: "tailwindcss"
+    - dependency: "@radix-ui/themes"
+    - dependency: "styled-components"
+    - dependency: "react"
+    - path: "src/components/**"
+    - path: "src/app/**"
+    - path: "src/pages/**"
+
+provides:
+  agents:
+    - frontend-designer
+  workflows:
+    - brief-inference
+    - dial-configuration
+  validators:
+    - anti-default-check
+    - typography-contrast-check
+
+context:
+  preload:
+    - rules/design-taste.md

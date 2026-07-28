@@ -1,0 +1,26 @@
+id: motion-design
+version: 1.0.0
+name: Emil Kowalski Motion Engineering
+description: Micro-interactions, spring dynamics, GSAP/Framer Motion, hardware-accelerated animations, layout transitions, physics-based motion curves, and accessibility (reduced-motion).
+
+activation:
+  any:
+    - dependency: "framer-motion"
+    - dependency: "gsap"
+    - dependency: "@react-spring/web"
+    - dependency: "lucide-react"
+    - path: "src/components/**"
+
+provides:
+  agents:
+    - motion-engineer
+  workflows:
+    - spring-tuning
+    - scroll-trigger
+  validators:
+    - reduced-motion-check
+    - transform-only-check
+
+context:
+  preload:
+    - rules/motion-principles.md

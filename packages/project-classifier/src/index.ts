@@ -31,6 +31,9 @@ export class ProjectClassifier {
     if (hasSupabase) {
       enabledExperts.push("postgresql", "supabase");
     }
+    if (hasReact || hasNext) {
+      enabledExperts.push("design-taste", "motion-design", "impeccable-design");
+    }
     enabledExperts.push("security", "testing");
 
     return {

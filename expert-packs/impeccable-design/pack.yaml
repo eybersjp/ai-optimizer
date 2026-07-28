@@ -1,0 +1,26 @@
+id: impeccable-design
+version: 1.0.0
+name: Impeccable UI & Design Commands
+description: Comprehensive suite of 22 executable UI/UX design commands and rules for layout, contrast, spacing, typography, state indicators, micro-interactions, responsive design, dark mode, accessible focus states, and component hierarchy.
+
+activation:
+  any:
+    - dependency: "tailwindcss"
+    - dependency: "react"
+    - dependency: "vue"
+    - dependency: "svelte"
+    - path: "src/components/**"
+
+provides:
+  agents:
+    - ui-architect
+  workflows:
+    - ui-audit
+    - design-refactor
+  validators:
+    - contrast-ratio-check
+    - focus-visible-check
+
+context:
+  preload:
+    - rules/impeccable-commands.md
