@@ -15,9 +15,22 @@ export interface ClassifyOptions {
 export class ProjectClassifier {
   public classify(scanResult: ScanResult, options: ClassifyOptions): ProjectProfile {
     const projectName = path.basename(scanResult.root);
-    const hasNext = scanResult.frameworks.includes("nextjs");
-    const hasSupabase = scanResult.frameworks.includes("supabase");
-    const hasReact = scanResult.frameworks.includes("react");
+
+    // Combine top-level and workspace-level frameworks
+    const allFrameworks = new Set<string>(scanResult.frameworks);
+    if (scanResult.rich?.workspacePackages) {
+      for (const pkg of scanResult.rich.workspacePackages) {
+        for (const fw of pkg.frameworks) {
+          allFrameworks.add(fw);
+        }
+      }
+    }
+
+    const hasNext = allFrameworks.has("nextjs");
+    const hasSupabase = allFrameworks.has("supabase");
+    const hasReact = allFrameworks.has("react");
+    const hasExpress = allFrameworks.has("express");
+    const hasFastify = allFrameworks.has("fastify");
 
     // Infer archetype & maturity
     let archetype = "modular-monolith";
@@ -25,6 +38,8 @@ export class ProjectClassifier {
       archetype = "multi-tenant-saas";
     } else if (hasReact) {
       archetype = "frontend-application";
+    } else if (hasExpress || hasFastify) {
+      archetype = "backend-service";
     }
 
     const maturity = "active-development";
@@ -46,18 +61,20 @@ export class ProjectClassifier {
     }
     enabledExperts.push("security", "testing");
 
+    const frameworksList = Array.from(allFrameworks).sort();
+
     return {
       schemaVersion: "1.0.0",
       project: {
         id: options.projectId,
         name: projectName,
-        root: scanResult.root,
+        root: ".", // Portable repository-relative root
         archetype,
         maturity
       },
       stack: {
         languages: scanResult.languages.length > 0 ? scanResult.languages : ["typescript"],
-        frameworks: scanResult.frameworks,
+        frameworks: frameworksList,
         packageManager: "pnpm",
         database: hasSupabase ? "postgresql" : undefined,
         databaseProvider: hasSupabase ? "supabase" : undefined,

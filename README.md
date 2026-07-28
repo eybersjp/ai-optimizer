@@ -33,11 +33,11 @@ Fastify Daemon API & React Dashboard
 ## ✨ Key Capabilities
 
 1. **5-Pass Autonomous Project Scanner**
-   - **Pass 1 (Filesystem)**: Fast glob discovery ignoring dependencies & build outputs.
-   - **Pass 2 (Dependencies)**: Manifest parsing (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) to map frameworks.
-   - **Pass 3 (Topology)**: Monorepo vs single package detection, frontend/backend splits, database migrations.
-   - **Pass 4 (Git Inspection)**: Branch summaries and repository status without sending full git history to LLMs.
-   - **Pass 5 (Semantic Inspection)**: High-level architectural intent extraction.
+   - **Pass 1 (Filesystem)**: Fast, bounded discovery ignoring dependencies & build outputs with path normalisation.
+   - **Pass 2 (Dependencies & Stack)**: Manifest parsing (`package.json`, `pyproject.toml`, `Cargo.toml`, `Dockerfile`, `compose.yaml`, `firebase.json`, `supabase`, etc.) mapping 13+ languages and 17+ frameworks.
+   - **Pass 3 (Topology)**: Package graph construction, monorepo/workspace topology detection, role assignment (frontend, cli, daemon, library, contracts, adapter).
+   - **Pass 4 (Git Inspection)**: Branch, HEAD, SHA, dirty state, and redacted remotes via non-interpolated execution without sending history to LLMs.
+   - **Pass 5 (Architectural Synthesis)**: Deterministic rule-based architectural synthesis (`monorepo`, `frontend-backend-separation`, `shared-contracts`, `adapter-architecture`, `test-framework`, `database-presence`) with confidence scoring.
 
 2. **Evidence-Backed Assertion Engine**
    - Every project finding is stored as a traceable assertion with confidence scores, subject-predicate definitions, and exact file/line provenance (`observed`, `inferred`, `recommended`, `unresolved`).

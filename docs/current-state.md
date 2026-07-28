@@ -6,12 +6,13 @@ The following components are fully operational, tested, and integrated into the 
 
 - **Monorepo Architecture**: 16 workspace projects managed via pnpm, compiled using TypeScript with strict mode.
 - **Provider-Neutral Domain Contracts (`@ai-optimize/contracts`)**: Complete Zod schemas and type definitions for project profiles, evidence assertions, expert packs, compiler output, activation results, and adapter interfaces.
-- **4-Pass Repository Scanner (`@ai-optimize/project-scanner`)**:
-  - Pass 1 (Filesystem Walk): Recursive file discovery ignoring dependencies and build outputs.
-  - Pass 2 (Dependencies & Stack): Manifest parsing (`package.json`) mapping languages and frameworks (`react`, `nextjs`, `fastify`, `supabase`, `vitest`).
-  - Pass 3 (Topology): Monorepo vs. single-package detection via `pnpm-workspace.yaml` / `lerna.json`.
-  - Pass 4 (Git Check): Detection of `.git` repository directory.
-- **Traceable Assertion Engine (`@ai-optimize/evidence-engine`)**: Assertion builder storing status (`observed`, `inferred`, `recommended`, `unresolved`), confidence scores, and source file/line provenance.
+- **5-Pass Repository Scanner (`@ai-optimize/project-scanner`)**:
+  - Pass 1 (Safe Filesystem Walk): Bounded file discovery ignoring build outputs and temp state, with symlink loop detection and path normalisation.
+  - Pass 2 (Manifests & Tech): Manifest parsing (`package.json`, `pnpm-workspace.yaml`, `tsconfig.json`, `pyproject.toml`, `requirements.txt`, `Cargo.toml`, `Dockerfile`, `compose.yaml`, `firebase.json`, `supabase/config.toml`, etc.) mapping 13+ languages and 17+ frameworks (`react`, `nextjs`, `vite`, `express`, `fastify`, `vitest`, `sqlite`, `supabase`, `firebase`, etc.).
+  - Pass 3 (Topology & Graph): Monorepo and workspace discovery, package dependency graph (`nodes`, `edges`), package role classification, and topology detection (`single-package`, `monorepo`, `multi-application`, `mixed-language`).
+  - Pass 4 (Safe Git Intelligence): Non-interpolated child process execution collecting branch, HEAD, commit SHA, dirty state, redacted remotes, and recent commits (max 10).
+  - Pass 5 (Deterministic Architectural Synthesis): Rule-based architectural synthesis (`monorepo`, `frontend-backend-separation`, `shared-contracts`, `adapter-architecture`, `test-framework`, `database-presence`) with explicit confidence scores and supporting evidence references.
+- **Traceable Assertion Engine (`@ai-optimize/evidence-engine`)**: Assertion builder storing status (`observed`, `inferred`, `recommended`, `unresolved`), confidence scores, and source file/line provenance. Deterministic assertion IDs generated via `@ai-optimize/project-identity`.
 - **Archetype Classifier (`@ai-optimize/project-classifier`)**: Stack-to-archetype classifier mapping findings to active expert pack lists.
 - **Expert Pack Engine (`@ai-optimize/expert-engine`)**: YAML pack loader (`pack.yaml`) for 8 built-in expert packs.
 - **Recommendation Engine (`@ai-optimize/recommendation-engine`)**: Generates rule-based and evidence-inferred recommendations.

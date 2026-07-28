@@ -60,10 +60,14 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 5. **CLI ran fresh scan+classify on every command** — All 9 CLI commands and all 7 daemon endpoints now load canonical identity and pass the same `projectId` through classification and compilation.
 6. **Inconsistent project IDs in checked-in state** — The current repository had `prj_HJCZZU3X` (managed-artifacts) and `prj_5IKAG2Z3` (project-profile). Reconciled to `prj_HJCZZU3X` as canonical with `prj_5IKAG2Z3` as a superseded alias in `.ai-optimize/project.json`.
 
+### Resolved (Milestone 3)
+7. **Shallow Scanner & Missing Multi-Pass Intelligence** — Refactored `@ai-optimize/project-scanner` into an evidence-backed 5-pass repository intelligence engine. Implemented bounded filesystem discovery (Pass 1), manifest/technology parsing for JS/TS/Python/Rust/Docker/Firebase/Supabase (Pass 2), package graph and monorepo topology discovery (Pass 3), safe Git intelligence (Pass 4), and deterministic architectural synthesis (Pass 5).
+8. **Express misclassified as Fastify** — Corrected defect where Express was reported as Fastify in scanner framework detection rules.
+9. **Absolute path leaking in profile** — Replaced machine-specific absolute `project.root` in generated profiles with portable repository-relative `"."`.
+
 ### Remaining Defects
-7. **Invalid JSON syntax in VSCode adapter**: `VSCodeAdapter` generates managed blocks with `//` single-line comments in `.vscode/settings.json`, causing strict JSON parsers to fail.
-8. **Incomplete Scanner Passes**: Scanner Pass 4 (Git Inspection) only checks `.git` directory existence; Pass 5 (Semantic Inspection) is not implemented.
-9. **Lack of stdio MCP Transport**: `@ai-optimize/mcp-server` implements tool logic but lacks a stdio server entry point for external AI host connections.
+10. **Invalid JSON syntax in VSCode adapter**: `VSCodeAdapter` generates managed blocks with `//` single-line comments in `.vscode/settings.json`, causing strict JSON parsers to fail.
+11. **Lack of stdio MCP Transport**: `@ai-optimize/mcp-server` implements tool logic but lacks a stdio server entry point for external AI host connections.
 
 ---
 
@@ -76,11 +80,11 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 - `project.json` (`.ai-optimize/project.json`) is NOT gitignored because it represents canonical project identity that must travel with the repository. It is committed and versioned alongside `project-profile.json`. Unlike backups and lock files (ephemeral runtime state), `project.json` is the single source of truth for stable project ID across all operations, migrations, and clones.
 - Selected `prj_HJCZZU3X` as the canonical project ID for this repository because it is the consistent identity across all five managed-artifact records (`managed-artifacts.json`), while `prj_5IKAG2Z3` only appeared in a single generated profile.
 - Identity tests operate on isolated temporary directories (`fs.mkdtempSync`) to avoid depending on the developer's actual checkout path or committed local runtime state.
+- Structured `@ai-optimize/project-scanner` into explicit passes (`filesystem`, `manifest`, `topology`, `git`, `architecture`) with typed context, diagnostic codes, safety bounds, and deterministic output.
 
 ---
 
 ## Unresolved Issues
-- Scanner Pass 4 and Pass 5 completeness.
 - Invalid JSON comment syntax in VSCode managed settings block.
 - Lack of standalone CLI stdio transport entry point for `mcp-server`.
 - Unit test coverage gaps for individual packages.
@@ -90,3 +94,4 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 ## Completed Milestones
 - **Baseline Milestone**: Established trustworthy core development baseline (`dev/trustworthy-core-v0.1.1`). 100% passing build (`pnpm build`), test suite (`pnpm test`), and typecheck (`pnpm lint`).
 - **Milestone 2 (Stable and Deterministic Project Identity)**: Created `@ai-optimize/project-identity` package with crypto-based ID generation, stable assertion IDs, deterministic compilation, legacy migration, controlled reconciliation, typed identity errors, and 17+ comprehensive identity tests. Branch: `dev/trustworthy-core-v0.1.1`.
+- **Milestone 3 (Evidence-Backed Multi-Pass Repository Scanner)**: Refactored `@ai-optimize/project-scanner` into a 5-pass bounded intelligence engine, supporting JS/TS, Python, Rust, Docker, Firebase, Supabase, package graphs, safe Git inspection, deterministic assertion IDs via `@ai-optimize/project-identity`, and a 26-case fixture-based test suite. Branch: `dev/trustworthy-core-v0.1.1`.

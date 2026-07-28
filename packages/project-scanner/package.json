@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@ai-optimize/contracts": "workspace:*",
-    "@ai-optimize/evidence-engine": "workspace:*"
+    "@ai-optimize/evidence-engine": "workspace:*",
+    "@ai-optimize/project-identity": "workspace:*",
+    "yaml": "^2.7.0"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

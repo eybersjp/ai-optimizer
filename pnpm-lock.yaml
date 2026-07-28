@@ -252,6 +252,12 @@ importers:
       '@ai-optimize/evidence-engine':
         specifier: workspace:*
         version: link:../evidence-engine
+      '@ai-optimize/project-identity':
+        specifier: workspace:*
+        version: link:../project-identity
+      yaml:
+        specifier: ^2.7.0
+        version: 2.9.0
     devDependencies:
       typescript:
         specifier: ^5.7.2
