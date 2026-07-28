@@ -9,7 +9,7 @@
  *
  * Reconciliation:
  * - Validates the selected ID exists among discovered candidates (unless --create-new is used).
- * - Creates a complete backup of the .ai-optimize directory before modification.
+ * - Creates a purpose-built identity snapshot before modification (only files that may change).
  * - Updates canonical identity consistently.
  * - Preserves superseded IDs in the aliases array.
  * - Records a migration event in events.jsonl.
@@ -39,6 +39,16 @@ export interface ReconciliationResult {
   supersededIds: string[];
   backupPath: string;
 }
+
+/**
+ * Files that may be modified by reconciliation.
+ * The backup snapshot only captures these files — not backups, locks, history, or databases.
+ */
+const RECONCILIATION_AFFECTED_FILES = new Set([
+  "project.json",
+  "project-profile.json",
+  "managed-artifacts.json"
+]);
 
 /**
  * Report identity status without modifying anything.
@@ -95,9 +105,14 @@ export async function reconcileIdentity(
     );
   }
 
-  // Create backup before any modification
+  // Create a purpose-built identity snapshot before any modification.
+  // This captures only the files that may be changed by reconciliation,
+  // NOT backups, locks, staging, event history, SQLite databases, or temp files.
   const backupId = generateBackupId();
-  const backupPath = await createAiOptDirBackup(aiOptDir, backupId);
+  const backupPath = createIdentitySnapshot(aiOptDir, backupId);
+
+  // Capture pre-reconciliation file contents for safe rollback on failure
+  const affectedSnapshots = readAffectedFilesSnapshot(aiOptDir);
 
   try {
     // Load existing identity if present to preserve its createdAt and merge aliases
@@ -139,52 +154,108 @@ export async function reconcileIdentity(
       backupPath
     };
   } catch (err) {
+    // On failure: restore the exact affected files from the pre-reconciliation snapshot
+    restoreAffectedFiles(aiOptDir, affectedSnapshots);
+
     throw new IdentityError(
       "IDENTITY_RECONCILIATION_FAILED",
-      `Reconciliation failed: ${(err as Error).message}. Backup preserved at ${backupPath}.`,
+      `Reconciliation failed: ${(err as Error).message}. ` +
+        `Affected files have been restored from snapshot. Backup preserved at ${backupPath}.`,
       { backupPath, originalError: (err as Error).message }
     );
   }
 }
 
 /**
- * Create a timestamped backup of the entire .ai-optimize directory.
+ * Create a purpose-built identity snapshot containing only the files that may be
+ * changed by reconciliation:
+ *   - project.json
+ *   - project-profile.json
+ *   - managed-artifacts.json
+ *
+ * Explicitly excluded:
+ *   - .ai-optimize/backups/*
+ *   - .ai-optimize/staging/*
+ *   - .ai-optimize/activation.lock
+ *   - .ai-optimize/events.jsonl (immutable historical events — never rewritten)
+ *   - SQLite -wal and -shm files
+ *   - Temporary files (*.tmp, *.temp)
+ *   - The backup currently being created
+ *
+ * The backup is written as JSON to .ai-optimize/backups/<backupId>-pre-reconcile.json.
  */
-async function createAiOptDirBackup(
-  aiOptDir: string,
-  backupId: string
-): Promise<string> {
+function createIdentitySnapshot(aiOptDir: string, backupId: string): string {
   const backupDir = path.join(aiOptDir, "backups");
   fs.mkdirSync(backupDir, { recursive: true });
 
   const backupPath = path.join(backupDir, `${backupId}-pre-reconcile.json`);
 
-  // Snapshot all JSON files in .ai-optimize (excluding backups dir itself)
   const snapshot: Record<string, unknown> = {
     backupId,
     timestamp: new Date().toISOString(),
+    type: "identity-reconciliation-snapshot",
     files: {}
   };
 
-  if (fs.existsSync(aiOptDir)) {
-    for (const entry of fs.readdirSync(aiOptDir)) {
-      if (entry === "backups") continue;
-      const fullPath = path.join(aiOptDir, entry);
-      try {
-        if (fs.statSync(fullPath).isFile()) {
-          (snapshot["files"] as Record<string, string>)[entry] = fs.readFileSync(
-            fullPath,
-            "utf-8"
-          );
-        }
-      } catch {
-        // Skip unreadable files
+  const files = snapshot["files"] as Record<string, string>;
+
+  for (const fileName of RECONCILIATION_AFFECTED_FILES) {
+    const fullPath = path.join(aiOptDir, fileName);
+    try {
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        files[fileName] = fs.readFileSync(fullPath, "utf-8");
       }
+    } catch {
+      // Skip unreadable files
     }
   }
 
   fs.writeFileSync(backupPath, JSON.stringify(snapshot, null, 2), "utf-8");
   return backupPath;
+}
+
+/**
+ * Read the current content of all files affected by reconciliation.
+ * Used for safe rollback on failure.
+ */
+function readAffectedFilesSnapshot(aiOptDir: string): Map<string, string | null> {
+  const snapshot = new Map<string, string | null>();
+  for (const fileName of RECONCILIATION_AFFECTED_FILES) {
+    const fullPath = path.join(aiOptDir, fileName);
+    try {
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        snapshot.set(fileName, fs.readFileSync(fullPath, "utf-8"));
+      } else {
+        snapshot.set(fileName, null); // File doesn't exist
+      }
+    } catch {
+      snapshot.set(fileName, null);
+    }
+  }
+  return snapshot;
+}
+
+/**
+ * Restore affected files from a pre-reconciliation snapshot.
+ * Used as a fail-safe when reconciliation throws after modifying files.
+ */
+function restoreAffectedFiles(aiOptDir: string, snapshot: Map<string, string | null>): void {
+  for (const [fileName, content] of snapshot) {
+    const fullPath = path.join(aiOptDir, fileName);
+    try {
+      if (content === null) {
+        // File didn't exist before — remove if it was created
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } else {
+        // Restore original content
+        fs.writeFileSync(fullPath, content, "utf-8");
+      }
+    } catch {
+      // Best-effort restore — continue to next file
+    }
+  }
 }
 
 /**

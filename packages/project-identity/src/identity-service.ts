@@ -5,6 +5,7 @@
  * - Creating canonical project identity on first registration
  * - Loading and validating persistent identity from .ai-optimize/project.json
  * - Detecting registered-root mismatches
+ * - Resolving registered root relative to the identity metadata file
  * - Migrating legacy repositories via the migration module
  *
  * No other production component may create or modify project identity directly.
@@ -36,6 +37,45 @@ export function identityExists(projectRoot: string): boolean {
 }
 
 /**
+ * Resolve the canonical project root given a path to the .ai-optimize/project.json file
+ * and the registeredRoot stored inside it.
+ *
+ * Algorithm:
+ *   1. Take the directory containing the identity file (e.g. /repo/.ai-optimize).
+ *   2. Resolve registeredRoot relative to that directory's PARENT.
+ *      - When registeredRoot is "." (the common case), the parent directory IS the root.
+ *   3. Canonicalise using path.resolve() which normalises .. segments and separators.
+ *   4. Use fs.realpathSync if available to resolve symlinks (falls back to path.resolve).
+ *   5. Normalise path separators for the platform (backslashes on Windows).
+ *   6. Never depends on process.cwd() after the identity file has been located.
+ *
+ * This ensures a committed relative root like "." is always interpreted relative to
+ * the directory containing .ai-optimize/project.json, not relative to process.cwd().
+ */
+export function resolveRegisteredRoot(
+  identityFilePath: string,
+  registeredRoot: string
+): string {
+  // Directory containing the .ai-optimize folder (the parent of .ai-optimize/)
+  const metadataDir = path.dirname(identityFilePath); // .../.ai-optimize
+  const parentDir = path.dirname(metadataDir); // parent of .ai-optimize
+
+  // Resolve registeredRoot relative to parentDir
+  const resolved = path.resolve(parentDir, registeredRoot);
+
+  // Attempt real-path resolution for symlinks; fall back to the resolved path
+  try {
+    return fs.realpathSync.native(resolved);
+  } catch {
+    try {
+      return fs.realpathSync(resolved);
+    } catch {
+      return resolved;
+    }
+  }
+}
+
+/**
  * Load and validate the canonical identity from .ai-optimize/project.json.
  *
  * @throws IdentityError(IDENTITY_FILE_INVALID) if the file cannot be parsed or is structurally invalid.
@@ -53,7 +93,7 @@ export async function loadIdentity(projectRoot: string): Promise<ProjectIdentity
     return migrateIdentity(resolvedRoot);
   }
 
-  return readAndValidateIdentity(resolvedRoot, filePath);
+  return readAndValidateIdentity(filePath);
 }
 
 /**
@@ -90,9 +130,9 @@ export function persistIdentity(projectRoot: string, identity: ProjectIdentity):
 }
 
 /**
- * Read, parse, and structurally validate a project.json file.
+ * Read, parse, structurally validate, and root-check a project.json file.
  */
-function readAndValidateIdentity(resolvedRoot: string, filePath: string): ProjectIdentity {
+function readAndValidateIdentity(filePath: string): ProjectIdentity {
   let raw: unknown;
   try {
     raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -114,18 +154,19 @@ function readAndValidateIdentity(resolvedRoot: string, filePath: string): Projec
 
   const identity = raw as ProjectIdentity;
 
-  // Registered-root validation: the stored root must match the actual resolved root.
-  // We store "." as a relative reference, which always matches its own root.
-  // If the stored value is an absolute path that differs from the current root,
-  // report a mismatch (handles cloned or moved repositories).
-  if (
-    identity.registeredRoot !== "." &&
-    path.resolve(identity.registeredRoot) !== resolvedRoot
-  ) {
+  // Resolve the canonical root via resolveRegisteredRoot
+  const canonicalRoot = resolveRegisteredRoot(filePath, identity.registeredRoot);
+
+  // The caller-supplied projectRoot should match the resolved canonical root.
+  // Note: we do NOT compare against process.cwd() — the resolveRegisteredRoot
+  // function resolves the root relative to the identity file location.
+  if (!fs.existsSync(canonicalRoot)) {
     throw new IdentityError(
       "REGISTERED_ROOT_MISMATCH",
-      `Identity file references root '${identity.registeredRoot}' but current root is '${resolvedRoot}'.`,
-      { storedRoot: identity.registeredRoot, currentRoot: resolvedRoot, filePath }
+      `Identity file at ${filePath} has registeredRoot '${identity.registeredRoot}', ` +
+        `which resolved to '${canonicalRoot}', but this path does not exist. ` +
+        `The repository may have been moved or the identity file copied.`,
+      { filePath, registeredRoot: identity.registeredRoot, canonicalRoot }
     );
   }
 

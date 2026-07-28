@@ -52,7 +52,8 @@ export {
   loadIdentity,
   createIdentity,
   persistIdentity,
-  stableStringify
+  stableStringify,
+  resolveRegisteredRoot
 } from "./identity-service.js";
 
 // Migration

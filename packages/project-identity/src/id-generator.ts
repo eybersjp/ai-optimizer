@@ -1,52 +1,58 @@
 /**
  * Cryptographically secure identifier generators.
  *
- * All identifiers use node:crypto. Math.random() is never used.
+ * All identifiers use node:crypto.randomUUID() (128-bit entropy).
+ * Math.random() is never used.
  * Each generator returns a collision-resistant, clearly prefixed string.
  */
 import * as crypto from "node:crypto";
 
 /**
+ * Generate the prefix portion of a UUID-derived identifier.
+ * Uses crypto.randomUUID() for 128-bit random entropy (RFC 4122 UUID v4).
+ * Strips hyphens and converts the UUID hex chars (32 nibbles = 128 bits).
+ */
+function uuidHex(uppercase: boolean): string {
+  const raw = crypto.randomUUID().replace(/-/g, "");
+  return uppercase ? raw.toUpperCase() : raw.toLowerCase();
+}
+
+/**
  * Generate a stable project ID.
- * Format: prj_<16 uppercase hex chars>
+ * Format: prj_<32 uppercase hex chars> (128-bit entropy via randomUUID)
  */
 export function generateProjectId(): string {
-  const bytes = crypto.randomBytes(8);
-  return `prj_${bytes.toString("hex").toUpperCase()}`;
+  return `prj_${uuidHex(true)}`;
 }
 
 /**
  * Generate a cryptographically secure activation ID.
- * Format: act_<16 lowercase hex chars>
+ * Format: act_<32 lowercase hex chars> (128-bit entropy via randomUUID)
  */
 export function generateActivationId(): string {
-  const bytes = crypto.randomBytes(8);
-  return `act_${bytes.toString("hex")}`;
+  return `act_${uuidHex(false)}`;
 }
 
 /**
  * Generate a cryptographically secure backup ID.
- * Format: bk_<16 lowercase hex chars>
+ * Format: bk_<32 lowercase hex chars> (128-bit entropy via randomUUID)
  */
 export function generateBackupId(): string {
-  const bytes = crypto.randomBytes(8);
-  return `bk_${bytes.toString("hex")}`;
+  return `bk_${uuidHex(false)}`;
 }
 
 /**
  * Generate a cryptographically secure event ID.
- * Format: evt_<20 lowercase hex chars>
+ * Format: evt_<32 lowercase hex chars> (128-bit entropy via randomUUID)
  */
 export function generateEventId(): string {
-  const bytes = crypto.randomBytes(10);
-  return `evt_${bytes.toString("hex")}`;
+  return `evt_${uuidHex(false)}`;
 }
 
 /**
  * Generate a cryptographically secure correlation ID.
- * Format: cor_<16 lowercase hex chars>
+ * Format: cor_<32 lowercase hex chars> (128-bit entropy via randomUUID)
  */
 export function generateCorrelationId(): string {
-  const bytes = crypto.randomBytes(8);
-  return `cor_${bytes.toString("hex")}`;
+  return `cor_${uuidHex(false)}`;
 }

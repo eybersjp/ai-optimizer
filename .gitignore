@@ -28,16 +28,38 @@ temp_test_repo/
 .env.*.local
 *.local.json
 
-# AI Optimize Managed Runtime (Backups & Staging)
+# AI Optimize — Committed vs Ignored Policy
+#
+# Committed (portable repository metadata):
+#   .ai-optimize/project.json       — Canonical project identity (schema version, projectId,
+#                                      registeredRoot, aliases). Travels with the repo so that
+#                                      every clone has the same stable identity.
+#
+# Generated derived state (committed — tracks with repo, regenerated on compile):
+#   .ai-optimize/project-profile.json — Provider-neutral project profile.
+#
+# Local runtime state (NOT committed — machine-specific or ephemeral):
+#   .ai-optimize/managed-artifacts.json — Activation ledger with machine-specific hashes and
+#                                          absolute paths. NOT committed.
+#   .ai-optimize/backups/               — Backup snapshots (ephemeral runtime state).
+#   .ai-optimize/activation.lock        — Process lock (ephemeral).
+#   .ai-optimize/events.jsonl           — Event history containing local activity timestamps.
+#   .ai-optimize/*.db, *.db-wal, *.db-shm  — SQLite databases (local runtime state).
+#   .ai-optimize/staging/               — Staging directory for activation.
+#
+# .ai-optimize/project.json is the single source of truth for stable project ID
+# across all operations, migrations, and clones. It must be committed to ensure
+# identity survives clones, branches, and CI environments.
+
+# Ignored: local runtime state, backups, locks, databases, staging, temp files
 .ai-optimize/backups/
 .ai-optimize/activation.lock
-
-# AI Optimize Identity Decision
-# .ai-optimize/project.json is NOT gitignored because it represents canonical
-# project identity that must travel with the repository. It is the single source
-# of truth for stable project ID across all operations, migrations, and clones.
-# Unlike backups and lock files (which are ephemeral runtime state), project.json
-# is intended to be committed and versioned alongside project-profile.json.
+.ai-optimize/managed-artifacts.json
+.ai-optimize/events.jsonl
+.ai-optimize/staging/
+.ai-optimize/*.db
+.ai-optimize/*.db-wal
+.ai-optimize/*.db-shm
 
 # OS Files
 .DS_Store

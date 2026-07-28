@@ -32,6 +32,7 @@ import {
   migrateIdentity,
   discoverCandidates,
   stableStringify,
+  resolveRegisteredRoot,
   IDENTITY_SCHEMA_VERSION,
   IDENTITY_FILE_NAME,
   IDENTITY_DIR
@@ -136,7 +137,8 @@ describe("Project Identity — Creation", () => {
     const dir = createTempDir();
 
     const identity = createIdentity(dir);
-    expect(identity.projectId).toMatch(/^prj_[A-F0-9]{16}$/);
+    // 128-bit UUID → 32 hex chars
+    expect(identity.projectId).toMatch(/^prj_[A-F0-9]{32}$/);
     expect(identity.schemaVersion).toBe("1.0.0");
     expect(identity.registeredRoot).toBe(".");
     expect(identity.identityVersion).toBe(1);
@@ -801,31 +803,411 @@ describe("stableStringify — Deterministic Serialization", () => {
 // Additional: Identifier generators use crypto and correct prefixes
 // ---------------------------------------------------------------------------
 describe("Identifier Generators — Crypto-based and Prefix-correct", () => {
-  it("generateProjectId returns prj_ prefixed hex string", () => {
+  it("generateProjectId returns prj_ prefixed 128-bit hex string", () => {
     const id = generateProjectId();
-    expect(id).toMatch(/^prj_[A-F0-9]{16}$/);
+    // randomUUID → 32 hex chars (128 bits)
+    expect(id).toMatch(/^prj_[A-F0-9]{32}$/);
   });
 
-  it("generateActivationId returns act_ prefixed hex string", () => {
+  it("generateActivationId returns act_ prefixed 128-bit hex string", () => {
     const id = generateActivationId();
-    expect(id).toMatch(/^act_[a-f0-9]{16}$/);
+    expect(id).toMatch(/^act_[a-f0-9]{32}$/);
   });
 
-  it("generateBackupId returns bk_ prefixed hex string", () => {
+  it("generateBackupId returns bk_ prefixed 128-bit hex string", () => {
     const id = generateBackupId();
-    expect(id).toMatch(/^bk_[a-f0-9]{16}$/);
+    expect(id).toMatch(/^bk_[a-f0-9]{32}$/);
   });
 
-  it("generateEventId returns evt_ prefixed hex string", () => {
+  it("generateEventId returns evt_ prefixed 128-bit hex string", () => {
     const id = generateEventId();
-    expect(id).toMatch(/^evt_[a-f0-9]{20}$/);
+    expect(id).toMatch(/^evt_[a-f0-9]{32}$/);
   });
 
   it("generated IDs are collision-resistant across multiple calls", () => {
     const ids = new Set<string>();
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 1000; i++) {
       ids.add(generateProjectId());
     }
-    expect(ids.size).toBe(100);
+    expect(ids.size).toBe(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Milestone 2A — Identifier Entropy Hardening
+// ---------------------------------------------------------------------------
+describe("Identifier Entropy — 128-bit UUID (Milestone 2A)", () => {
+  it("no identifier generator uses randomBytes(8) anymore", () => {
+    const source = fs.readFileSync(
+      path.resolve("./packages/project-identity/src/id-generator.ts"),
+      "utf-8"
+    );
+    // Should use randomUUID, not randomBytes
+    expect(source).toContain("randomUUID");
+    expect(source).not.toContain("randomBytes");
+  });
+
+  it("no production identifier generator uses Math.random()", () => {
+    const files = [
+      "packages/project-identity/src/id-generator.ts",
+      "packages/activation-engine/src/index.ts",
+      "packages/evidence-engine/src/index.ts",
+      "packages/memory-engine/src/index.ts"
+    ];
+    for (const file of files) {
+      const fullPath = path.resolve(file);
+      if (fs.existsSync(fullPath)) {
+        const content = fs.readFileSync(fullPath, "utf-8");
+        const codeLines = content.split("\n").filter((l) => {
+          const t = l.trim();
+          return !t.startsWith("//") && !t.startsWith("*") && !t.startsWith("/*");
+        });
+        for (const line of codeLines) {
+          expect(line).not.toMatch(/Math\.random\(\)/);
+        }
+      }
+    }
+  });
+
+  it("all ID prefixes are correct (prj_, act_, bk_, evt_, cor_)", () => {
+    expect(generateProjectId()).toMatch(/^prj_/);
+    expect(generateActivationId()).toMatch(/^act_/);
+    expect(generateBackupId()).toMatch(/^bk_/);
+    expect(generateEventId()).toMatch(/^evt_/);
+  });
+
+  it("generates 1000 unique activation IDs", () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      ids.add(generateActivationId());
+    }
+    expect(ids.size).toBe(1000);
+  });
+
+  it("generates 1000 unique backup IDs", () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      ids.add(generateBackupId());
+    }
+    expect(ids.size).toBe(1000);
+  });
+
+  it("generates 1000 unique event IDs", () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      ids.add(generateEventId());
+    }
+    expect(ids.size).toBe(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Milestone 2A — Registered Root Resolution
+// ---------------------------------------------------------------------------
+describe("Registered Root — resolveRegisteredRoot (Milestone 2A)", () => {
+  it("resolves '.' as the parent directory of .ai-optimize/project.json", () => {
+    const dir = createTempDir();
+    const aiOptDir = path.join(dir, ".ai-optimize");
+    fs.mkdirSync(aiOptDir, { recursive: true });
+    const identityFile = path.join(aiOptDir, "project.json");
+    fs.writeFileSync(identityFile, "{}", "utf-8");
+
+    const resolved = resolveRegisteredRoot(identityFile, ".");
+    // The resolved root should be the parent of .ai-optimize, i.e., dir
+    expect(path.basename(resolved)).toBe(path.basename(dir));
+    // Should be normalized (no trailing separators)
+    expect(resolved).not.toMatch(/[/\\]$/);
+
+    removeTempDir(dir);
+  });
+
+  it("resolves a relative subdirectory correctly", () => {
+    const dir = createTempDir();
+    const aiOptDir = path.join(dir, ".ai-optimize");
+    fs.mkdirSync(aiOptDir, { recursive: true });
+    const identityFile = path.join(aiOptDir, "project.json");
+    fs.writeFileSync(identityFile, "{}", "utf-8");
+
+    const resolved = resolveRegisteredRoot(identityFile, "subdir");
+    expect(path.basename(resolved)).toBe("subdir");
+    expect(path.dirname(resolved)).toBe(path.resolve(dir));
+
+    removeTempDir(dir);
+  });
+
+  it("never depends on process.cwd() after the metadata file is located", () => {
+    // The resolveRegisteredRoot function receives the identity file path directly,
+    // so it always resolves relative to that file's location, not cwd.
+    const dir = createTempDir();
+    const nestedDir = path.join(dir, "nested", "deep");
+    fs.mkdirSync(nestedDir, { recursive: true });
+    const aiOptDir = path.join(nestedDir, ".ai-optimize");
+    fs.mkdirSync(aiOptDir, { recursive: true });
+    const identityFile = path.join(aiOptDir, "project.json");
+    fs.writeFileSync(identityFile, "{}", "utf-8");
+
+    // Resolve with registeredRoot "." meaning the parent of .ai-optimize is the root.
+    // This should resolve to nestedDir regardless of process.cwd().
+    const resolved = resolveRegisteredRoot(identityFile, ".");
+    expect(path.basename(resolved)).toBe(path.basename(nestedDir));
+    // The resolved path should equal the canonical nested directory
+    expect(resolved).toBe(path.resolve(nestedDir));
+
+    removeTempDir(dir);
+  });
+
+  it("handles a deleted root gracefully (does not throw)", () => {
+    const dir = createTempDir();
+    const aiOptDir = path.join(dir, ".ai-optimize");
+    fs.mkdirSync(aiOptDir, { recursive: true });
+    const identityFile = path.join(aiOptDir, "project.json");
+    fs.writeFileSync(identityFile, "{}", "utf-8");
+
+    // Remove the parent dir to simulate a deleted root
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(aiOptDir, { recursive: true }); // recreate .ai-optimize
+    fs.writeFileSync(identityFile, "{}", "utf-8");
+
+    // resolveRegisteredRoot should still resolve the path even if it no longer exists
+    const resolved = resolveRegisteredRoot(identityFile, ".");
+    // The returned path should still be a valid path string
+    expect(resolved).toBeTruthy();
+    expect(typeof resolved).toBe("string");
+
+    removeTempDir(dir);
+  });
+
+  it("detects a moved or copied identity file via non-existent resolved root on load", async () => {
+    const dir = createTempDir();
+    const identity: ProjectIdentity = {
+      schemaVersion: "1.0.0",
+      projectId: "prj_MOVEDROOTTEST001",
+      registeredRoot: "/nonexistent/moved/path",
+      createdAt: new Date().toISOString(),
+      identityVersion: 1,
+      aliases: []
+    };
+    persistIdentity(dir, identity);
+
+    // Loading should fail with REGISTERED_ROOT_MISMATCH because the resolved
+    // canonical root (/nonexistent/moved/path) does not exist.
+    await expect(loadIdentity(dir)).rejects.toMatchObject({
+      code: "REGISTERED_ROOT_MISMATCH"
+    });
+
+    removeTempDir(dir);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Milestone 2A — Reconciliation Backup Behaviour
+// ---------------------------------------------------------------------------
+describe("Reconciliation Backup — Scope and Safety (Milestone 2A)", () => {
+  it("backup creation terminates normally when previous backups exist", async () => {
+    const dir = createTempDir();
+    seedProjectProfile(dir, "prj_PROFILE_B1_00001");
+    seedManagedArtifacts(dir, "prj_MANAGED_B2_00002");
+
+    // Create a previous backup
+    const backupDir = path.join(dir, ".ai-optimize", "backups");
+    fs.mkdirSync(backupDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(backupDir, "bk_previous-backup.json"),
+      JSON.stringify({ previous: true }),
+      "utf-8"
+    );
+
+    // Reconciliation should succeed despite existing backups
+    const result = await reconcileIdentity(dir, "prj_MANAGED_B2_00002");
+    expect(result.success).toBe(true);
+    expect(result.canonical.projectId).toBe("prj_MANAGED_B2_00002");
+
+    // The previous backup must still exist
+    expect(fs.existsSync(path.join(backupDir, "bk_previous-backup.json"))).toBe(true);
+
+    removeTempDir(dir);
+  });
+
+  it("backup does not recursively include other backups", async () => {
+    const dir = createTempDir();
+    // Seed an existing project.json with the ID that matches managed-artifacts
+    const canonicalId = "prj_MANAGED_B4_00002";
+    persistIdentity(dir, {
+      schemaVersion: "1.0.0",
+      projectId: canonicalId,
+      registeredRoot: ".",
+      createdAt: new Date().toISOString(),
+      identityVersion: 1,
+      aliases: []
+    });
+    seedProjectProfile(dir, "prj_PROFILE_B3_00001");
+    seedManagedArtifacts(dir, canonicalId);
+    seedEventsJsonl(dir, canonicalId);
+
+    // Create a lock file and a stale backup — these must NOT appear in the snapshot
+    const aiOptDir = path.join(dir, ".ai-optimize");
+    fs.writeFileSync(path.join(aiOptDir, "activation.lock"), "stale", "utf-8");
+    const backupDir = path.join(aiOptDir, "backups");
+    fs.mkdirSync(backupDir, { recursive: true });
+    fs.writeFileSync(path.join(backupDir, "stale-backup.json"), "{}", "utf-8");
+
+    const result = await reconcileIdentity(dir, canonicalId);
+    expect(result.success).toBe(true);
+
+    // Read the backup snapshot and verify it only contains the affected files
+    const snapshot = JSON.parse(fs.readFileSync(result.backupPath, "utf-8"));
+    const backedUpFiles = Object.keys(snapshot.files || {});
+    expect(backedUpFiles).toContain("project.json");
+    expect(backedUpFiles).toContain("project-profile.json");
+    expect(backedUpFiles).toContain("managed-artifacts.json");
+    // Must NOT include backups, lock, or events.jsonl
+    expect(backedUpFiles).not.toContain("backups");
+    expect(backedUpFiles).not.toContain("activation.lock");
+    expect(backedUpFiles).not.toContain("events.jsonl");
+
+    removeTempDir(dir);
+  });
+
+  it("immutable historical events are preserved after reconciliation", async () => {
+    const dir = createTempDir();
+    seedProjectProfile(dir, "prj_PROFILE_E1_00001");
+    seedManagedArtifacts(dir, "prj_MANAGED_E2_00002");
+    seedEventsJsonl(dir, "prj_MANAGED_E2_00002");
+
+    // Record the pre-reconciliation event content
+    const aiOptDir = path.join(dir, ".ai-optimize");
+    const eventsBefore = fs.readFileSync(path.join(aiOptDir, "events.jsonl"), "utf-8");
+
+    await reconcileIdentity(dir, "prj_MANAGED_E2_00002");
+
+    // Original events must still be present
+    const eventsAfter = fs.readFileSync(path.join(aiOptDir, "events.jsonl"), "utf-8");
+    expect(eventsAfter).toContain(eventsBefore.trim());
+
+    removeTempDir(dir);
+  });
+
+  it("superseded IDs remain discoverable via discoverCandidates after reconciliation", async () => {
+    const dir = createTempDir();
+    seedProjectProfile(dir, "prj_PROFILE_S1_00001");
+    seedManagedArtifacts(dir, "prj_MANAGED_S2_00002");
+
+    await reconcileIdentity(dir, "prj_MANAGED_S2_00002");
+
+    // Re-run discoverCandidates — the superseded ID should still be discoverable
+    // from the original project-profile.json
+    const candidates = discoverCandidates(dir);
+    const candidateIds = candidates.map((c) => c.projectId);
+    expect(candidateIds).toContain("prj_PROFILE_S1_00001");
+    expect(candidateIds).toContain("prj_MANAGED_S2_00002");
+
+    // The canonical identity should list the superseded ID in aliases
+    const identity = await loadIdentity(dir);
+    expect(identity.aliases).toContain("prj_PROFILE_S1_00001");
+
+    removeTempDir(dir);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Milestone 2A — Assertion Identity Path Normalization and Scope
+// ---------------------------------------------------------------------------
+describe("Assertion Identity — Path Separator Normalization (Milestone 2A)", () => {
+  const baseParams: AssertionIdParams = {
+    projectId: "prj_NORMTEST",
+    scannerRuleId: "scanner-v1",
+    scannerRuleVersion: "1.0.0",
+    subject: "test",
+    predicate: "value",
+    canonicalSourcePath: "src/lib/util.ts",
+    scopeKey: ""
+  };
+
+  it("backslash and forward slash produce the same ID on Windows", () => {
+    // Both should normalise to "src/lib/util.ts"
+    const idForward = deriveAssertionId({
+      ...baseParams,
+      canonicalSourcePath: "src/lib/util.ts"
+    });
+    const idBackslash = deriveAssertionId({
+      ...baseParams,
+      canonicalSourcePath: "src\\lib\\util.ts"
+    });
+    expect(idForward).toBe(idBackslash);
+  });
+
+  it("leading ./ is stripped for stable hashing", () => {
+    const idNoPrefix = deriveAssertionId({
+      ...baseParams,
+      canonicalSourcePath: "src/lib/util.ts"
+    });
+    const idWithDot = deriveAssertionId({
+      ...baseParams,
+      canonicalSourcePath: "./src/lib/util.ts"
+    });
+    expect(idNoPrefix).toBe(idWithDot);
+  });
+});
+
+describe("Assertion Identity — Source Line Range Scope (Milestone 2A)", () => {
+  const baseParams: AssertionIdParams = {
+    projectId: "prj_LINETEST",
+    scannerRuleId: "scanner-v1",
+    scannerRuleVersion: "1.0.0",
+    subject: "function",
+    predicate: "exists",
+    canonicalSourcePath: "src/index.ts",
+    scopeKey: ""
+  };
+
+  it("different source line ranges produce different IDs", () => {
+    const idNoRange = deriveAssertionId(baseParams);
+    const idRange1 = deriveAssertionId({ ...baseParams, sourceLineRange: "10-25" });
+    const idRange2 = deriveAssertionId({ ...baseParams, sourceLineRange: "30-45" });
+
+    expect(idNoRange).not.toBe(idRange1);
+    expect(idRange1).not.toBe(idRange2);
+  });
+
+  it("same evidence scope and line range produce the same ID", () => {
+    const a = deriveAssertionId({ ...baseParams, sourceLineRange: "42-58" });
+    const b = deriveAssertionId({ ...baseParams, sourceLineRange: "42-58" });
+    expect(a).toBe(b);
+  });
+
+  it("scopeKey changes produce different IDs", () => {
+    const a = deriveAssertionId({ ...baseParams, scopeKey: "package:foo" });
+    const b = deriveAssertionId({ ...baseParams, scopeKey: "package:bar" });
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("Assertion Identity — Object Property Ordering (Milestone 2A)", () => {
+  it("different property ordering in input does not affect the ID", () => {
+    // deriveAssertionId reads fields by name, not by spread order
+    const paramsA: AssertionIdParams = {
+      projectId: "prj_ORDER",
+      scannerRuleId: "rule-v1",
+      scannerRuleVersion: "1.0.0",
+      subject: "module",
+      predicate: "depends-on",
+      canonicalSourcePath: "package.json",
+      scopeKey: "lodash",
+      sourceLineRange: ""
+    };
+    const paramsB: AssertionIdParams = {
+      // Same values, different declaration order (though TypeScript interfaces
+      // don't enforce runtime ordering). The function reads named properties.
+      sourceLineRange: "",
+      scopeKey: "lodash",
+      canonicalSourcePath: "package.json",
+      predicate: "depends-on",
+      subject: "module",
+      scannerRuleVersion: "1.0.0",
+      scannerRuleId: "rule-v1",
+      projectId: "prj_ORDER"
+    };
+
+    expect(deriveAssertionId(paramsA)).toBe(deriveAssertionId(paramsB));
   });
 });

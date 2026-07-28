@@ -56,8 +56,16 @@ export interface AssertionIdParams {
   scannerRuleVersion: string;
   subject: string;
   predicate: string;
-  /** Relative canonical source path, or empty string if not applicable. */
+  /**
+   * Relative canonical source path, or empty string if not applicable.
+   * Path separators are normalised to forward slashes before hashing.
+   */
   canonicalSourcePath: string;
   /** Stable string encoding of the scope, or empty string. */
   scopeKey?: string;
+  /**
+   * Canonical source line range, formatted as "start-end" (e.g. "10-25").
+   * Empty string when not applicable. Must not include timestamps or random values.
+   */
+  sourceLineRange?: string;
 }
