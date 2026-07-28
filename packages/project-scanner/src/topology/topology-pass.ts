@@ -6,7 +6,7 @@
  *
  * Constructs a package graph for monorepos, detects topology type,
  * and assigns package roles based on generic evidence.
- */import type { ScannerPass, ScannerContext, ScannerPassResult, WorkspacePackage } from "../contracts.js";
+ */import type { ScannerPass, ScannerContext, ScannerPassResult, WorkspacePackage, ScannerDiagnostic } from "../contracts.js";
 import type { ScannerConfiguration } from "../configuration.js";
 import { EvidenceEngine } from "@ai-optimize/evidence-engine";
 import { buildPackageGraph, detectTopology } from "./package-graph.js";
@@ -19,10 +19,11 @@ export class TopologyPass implements ScannerPass {
 
   run(context: ScannerContext): ScannerPassResult {
     const evidence = new EvidenceEngine();
+    const passDiagnostics: ScannerDiagnostic[] = [];
 
     // Use workspace packages discovered by the manifest pass
     const packages: WorkspacePackage[] = context.workspacePackages;
-    const graph = buildPackageGraph(packages);
+    const graph = buildPackageGraph(packages, passDiagnostics);
     const topology = detectTopology(packages);
 
     // Evidence assertions
@@ -66,7 +67,7 @@ export class TopologyPass implements ScannerPass {
       version: this.version,
       aborted: false,
       assertions: evidence.getAssertions(),
-      diagnostics: [],
+      diagnostics: passDiagnostics,
       packageGraph: graph,
       workspacePackages: packages,
       topologyType: topology.type,

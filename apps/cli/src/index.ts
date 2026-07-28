@@ -98,11 +98,38 @@ program
 program
   .command("analyse [dir]")
   .description("Analyse repository architecture, stack, and evidence assertions")
-  .action(async (dir = ".") => {
+  .option("--summary", "Print concise workspace discovery and technology evidence summary")
+  .action(async (dir = ".", options: { summary?: boolean }) => {
     const root = path.resolve(dir);
     const identity = await requireIdentity(root);
     const scanResult = scanner.scan(root);
     const profile = classifier.classify(scanResult, { projectId: identity.projectId });
+
+    if (options.summary) {
+      console.log("\n=== WORKSPACE DISCOVERY SUMMARY ===");
+      console.log(`Repository Root:      ${scanResult.rich.rootRelative}`);
+      console.log(`pnpm Workspace Pkgs:  ${scanResult.rich.workspacePackages.length}`);
+      console.log(`Package Graph Nodes:  ${scanResult.rich.packageGraph.nodes.length}`);
+      console.log(`Repository Units:     ${scanResult.rich.repositoryUnits.length}`);
+      console.log(`Expert Packs:         ${scanResult.rich.expertPacks.length}`);
+      console.log(`Applications:         ${scanResult.rich.applications.length}`);
+      console.log(`Libraries:            ${scanResult.rich.libraries.length}`);
+      console.log(`Configuration Units:  ${scanResult.rich.configurationUnits.length}`);
+
+      console.log("\n=== WORKSPACE PACKAGES ===");
+      for (const pkg of scanResult.rich.workspacePackages) {
+        const matched = (pkg.matchedBy ?? []).join(",");
+        console.log(`- ${pkg.name.padEnd(38)} [${pkg.relativeDir}] role=${pkg.role ?? "unknown"} matchedBy=${matched}`);
+      }
+
+      console.log("\n=== TECHNOLOGY & FRAMEWORK EVIDENCE ===");
+      for (const tech of scanResult.rich.technologies) {
+        const pkgStr = tech.owningPackage ? `${tech.owningPackage} (${tech.owningPackageDir})` : ".";
+        console.log(`- [${tech.category.toUpperCase()}] ${tech.name.padEnd(12)} status=${tech.status.padEnd(8)} owner=${pkgStr.padEnd(45)} ver=${(tech.version ?? "unknown").padEnd(10)} src=${tech.sourcePath}`);
+        console.log(`  Evidence ID: ${tech.evidenceId}`);
+      }
+      return;
+    }
 
     console.log("\n=== PROJECT PROFILE ===");
     console.log(JSON.stringify(profile, null, 2));

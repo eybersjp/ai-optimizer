@@ -8,9 +8,65 @@ import type { PackageGraph, PackageGraphNode, PackageGraphEdge, WorkspacePackage
  * Identifies internal workspace dependencies by matching dependency names
  * against known workspace package names.
  */
-export function buildPackageGraph(packages: WorkspacePackage[]): PackageGraph {
+import type { ScannerDiagnostic, DependencyType } from "../contracts.js";
+import { diagnostic, DiagnosticCode } from "../diagnostics.js";
+
+/**
+ * Build a package graph from discovered workspace packages.
+ * Identifies internal workspace dependencies by matching dependency names
+ * against known workspace package names.
+ */
+export function buildPackageGraph(
+  packages: WorkspacePackage[],
+  diagnostics?: ScannerDiagnostic[]
+): PackageGraph {
   const nodes: PackageGraphNode[] = [];
   const edges: PackageGraphEdge[] = [];
+  const edgeSet = new Set<string>();
+
+  const nameToDirs = new Map<string, string[]>();
+  const dirToPkgs = new Map<string, WorkspacePackage[]>();
+
+  for (const pkg of packages) {
+    const dirs = nameToDirs.get(pkg.name) ?? [];
+    dirs.push(pkg.relativeDir);
+    nameToDirs.set(pkg.name, dirs);
+
+    const pkgs = dirToPkgs.get(pkg.relativeDir) ?? [];
+    pkgs.push(pkg);
+    dirToPkgs.set(pkg.relativeDir, pkgs);
+  }
+
+  // Diagnostics for duplicate names or directories
+  if (diagnostics) {
+    for (const [name, dirs] of nameToDirs) {
+      if (dirs.length > 1) {
+        diagnostics.push(
+          diagnostic(
+            DiagnosticCode.WORKSPACE_DUPLICATE_NAME,
+            "warning",
+            "topology",
+            `Duplicate package name '${name}' declared in multiple directories: ${dirs.join(", ")}`,
+            { path: dirs[0], recoverable: true, details: { name, directories: dirs } }
+          )
+        );
+      }
+    }
+
+    for (const [dir, pkgs] of dirToPkgs) {
+      if (pkgs.length > 1) {
+        diagnostics.push(
+          diagnostic(
+            DiagnosticCode.WORKSPACE_DUPLICATE_DIRECTORY,
+            "warning",
+            "topology",
+            `Directory '${dir}' produces duplicate workspace packages`,
+            { path: dir, recoverable: true }
+          )
+        );
+      }
+    }
+  }
 
   const packageNames = new Set(packages.map((p) => p.name));
 
@@ -21,24 +77,49 @@ export function buildPackageGraph(packages: WorkspacePackage[]): PackageGraph {
       role: pkg.role ?? "unknown"
     });
 
-    // Detect workspace dependencies
-    for (const [dep] of Object.entries(pkg.dependencies)) {
-      if (packageNames.has(dep)) {
-        edges.push({ source: pkg.name, target: dep, type: "workspace" });
+    const addEdge = (target: string, type: DependencyType) => {
+      if (packageNames.has(target)) {
+        const key = `${pkg.name}|${target}|${type}`;
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key);
+          edges.push({ source: pkg.name, target, type });
+        }
+      } else if (diagnostics && (target.startsWith("@ai-optimize/") || target.startsWith("workspace:"))) {
+        diagnostics.push(
+          diagnostic(
+            DiagnosticCode.WORKSPACE_DEPENDENCY_UNRESOLVED,
+            "warning",
+            "topology",
+            `Workspace package '${pkg.name}' has unresolved internal dependency '${target}'`,
+            { path: pkg.manifestPath, recoverable: true, details: { package: pkg.name, dependency: target } }
+          )
+        );
       }
+    };
+
+    for (const [dep] of Object.entries(pkg.dependencies)) {
+      addEdge(dep, "workspace");
     }
     for (const [dep] of Object.entries(pkg.devDependencies)) {
-      if (packageNames.has(dep)) {
-        edges.push({ source: pkg.name, target: dep, type: "development" });
-      }
+      addEdge(dep, "development");
+    }
+    for (const [dep] of Object.entries(pkg.peerDependencies)) {
+      addEdge(dep, "peer");
     }
   }
 
   // Sort for determinism
-  nodes.sort((a, b) => a.name.localeCompare(b.name));
+  nodes.sort((a, b) => {
+    const cmp = a.name.localeCompare(b.name);
+    return cmp !== 0 ? cmp : a.relativeDir.localeCompare(b.relativeDir);
+  });
+
   edges.sort((a, b) => {
-    const cmp = a.source.localeCompare(b.source);
-    return cmp !== 0 ? cmp : a.target.localeCompare(b.target);
+    const cmpSource = a.source.localeCompare(b.source);
+    if (cmpSource !== 0) return cmpSource;
+    const cmpTarget = a.target.localeCompare(b.target);
+    if (cmpTarget !== 0) return cmpTarget;
+    return a.type.localeCompare(b.type);
   });
 
   return { nodes, edges };

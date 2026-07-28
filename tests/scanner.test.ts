@@ -412,7 +412,7 @@ describe("Milestone 3 — Evidence-Backed Multi-Pass Repository Scanner", () => 
   });
 
   // Test 26: AI Optimize self-scan
-  it("26. AI Optimize self-scan", () => {
+  it("26. AI Optimize self-scan reconciliation and package-owned technology proof", () => {
     const root = path.resolve(".");
     const scanner = new ProjectScanner();
     const classifier = new ProjectClassifier();
@@ -420,14 +420,65 @@ describe("Milestone 3 — Evidence-Backed Multi-Pass Repository Scanner", () => 
     const scanResult = scanner.scan(root);
     const profile = classifier.classify(scanResult, { projectId: "prj_TESTFIXEDID0001" });
 
-    // Prove nested-workspace detection for required components
-    expect(scanResult.languages).toContain("typescript");
-    expect(scanResult.frameworks).toContain("react");
-    expect(scanResult.frameworks).toContain("vite");
-    expect(scanResult.frameworks).toContain("fastify");
-    expect(scanResult.frameworks).toContain("commander");
-    expect(scanResult.frameworks).toContain("vitest");
-    expect(scanResult.frameworks).toContain("sqlite");
+    // 1. Authoritative workspace count and package graph nodes
+    expect(scanResult.rich.workspacePackages.length).toBe(17);
+    expect(scanResult.rich.packageGraph.nodes.length).toBe(17);
+
+    // Distinct counts for non-package units
+    expect(scanResult.rich.expertPacks.length).toBeGreaterThan(0);
+    expect(scanResult.rich.repositoryUnits.length).toBeGreaterThan(17);
+
+    // 2. Explicit technology ownership assertions
+    const techs = scanResult.rich.technologies;
+
+    const reactTech = techs.find((t) => t.id === "react");
+    expect(reactTech).toBeDefined();
+    expect(reactTech?.owningPackage).toBe("@ai-optimize/dashboard");
+    expect(reactTech?.owningPackageDir).toBe("apps/dashboard");
+
+    const viteTech = techs.find((t) => t.id === "vite");
+    expect(viteTech).toBeDefined();
+    expect(viteTech?.owningPackage).toBe("@ai-optimize/dashboard");
+    expect(viteTech?.owningPackageDir).toBe("apps/dashboard");
+
+    const fastifyTech = techs.find((t) => t.id === "fastify");
+    expect(fastifyTech).toBeDefined();
+    expect(fastifyTech?.owningPackage).toBe("@ai-optimize/daemon");
+    expect(fastifyTech?.owningPackageDir).toBe("apps/daemon");
+
+    const commanderTech = techs.find((t) => t.id === "commander");
+    expect(commanderTech).toBeDefined();
+    expect(commanderTech?.owningPackage).toBe("@ai-optimize/cli");
+    expect(commanderTech?.owningPackageDir).toBe("apps/cli");
+
+    const vitestTech = techs.find((t) => t.id === "vitest");
+    expect(vitestTech).toBeDefined();
+    expect(vitestTech?.owningPackage).toBe("ai-optimize-monorepo");
+    expect(vitestTech?.owningPackageDir).toBe(".");
+
+    const sqliteTech = techs.find((t) => t.id === "node:sqlite");
+    expect(sqliteTech).toBeDefined();
+    expect(sqliteTech?.owningPackage).toBe("@ai-optimize/memory-engine");
+    expect(sqliteTech?.owningPackageDir).toBe("packages/memory-engine");
+    expect(sqliteTech?.sourcePath).toBe("packages/memory-engine/src/index.ts");
+
+    const pnpmTech = techs.find((t) => t.id === "pnpm");
+    expect(pnpmTech).toBeDefined();
+    expect(pnpmTech?.owningPackage).toBe("ai-optimize-monorepo");
+    expect(pnpmTech?.sourcePath).toBe("pnpm-workspace.yaml");
+
+    // TypeScript ownership across packages
+    const tsTechs = techs.filter((t) => t.id === "typescript");
+    expect(tsTechs.length).toBe(17);
+
+    // 3. Express is NOT detected
+    expect(scanResult.frameworks).not.toContain("express");
+    expect(techs.some((t) => t.id === "express")).toBe(false);
+
+    // 4. Duplicate pattern match provenance
+    const claudeCodePkg = scanResult.rich.workspacePackages.find((p) => p.relativeDir === "packages/adapters/claude-code");
+    expect(claudeCodePkg).toBeDefined();
+    expect(claudeCodePkg?.matchedBy).toContain("pnpm-workspace.yaml:packages/adapters/*");
 
     // Profile verification
     expect(profile.project.name).toBe("ai-optimizer");

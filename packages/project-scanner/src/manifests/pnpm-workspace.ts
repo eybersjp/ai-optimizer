@@ -34,27 +34,38 @@ export function parsePnpmWorkspace(filePath: string): PnpmWorkspaceConfig | null
  *   - "apps/*" → all dirs directly under apps/
  *   - "packages/adapters/*" → nested dirs
  */
-export function expandWorkspacePatterns(
-  patterns: string[],
+export interface WorkspacePatternSource {
+  source: string;
+  pattern: string;
+}
+
+export function expandWorkspacePatternsWithProvenance(
+  patternsWithSource: WorkspacePatternSource[],
   workspaceRoot: string,
   diagnostics: ScannerDiagnostic[]
-): string[] {
-  const dirs: string[] = [];
+): Map<string, string[]> {
+  const dirToPatterns = new Map<string, string[]>();
 
-  for (const pattern of patterns) {
+  for (const item of patternsWithSource) {
+    const provTag = `${item.source}:${item.pattern}`;
     try {
-      const expanded = expandPattern(pattern, workspaceRoot);
-      dirs.push(...expanded);
+      const expanded = expandPattern(item.pattern, workspaceRoot);
+      for (const dir of expanded) {
+        const existing = dirToPatterns.get(dir) ?? [];
+        if (!existing.includes(provTag)) {
+          existing.push(provTag);
+        }
+        dirToPatterns.set(dir, existing);
+      }
 
-      // If nothing matched, it might be an invalid pattern
-      if (expanded.length === 0 && !pattern.includes("*")) {
+      if (expanded.length === 0 && !item.pattern.includes("*")) {
         diagnostics.push(
           diagnostic(
             DiagnosticCode.WORKSPACE_PATTERN_INVALID,
             "warning",
             "manifest",
-            `Workspace pattern '${pattern}' did not match any directories`,
-            { path: pattern, recoverable: true }
+            `Workspace pattern '${item.pattern}' from '${item.source}' did not match any directories`,
+            { path: item.pattern, recoverable: true }
           )
         );
       }
@@ -64,14 +75,27 @@ export function expandWorkspacePatterns(
           DiagnosticCode.WORKSPACE_PATTERN_INVALID,
           "warning",
           "manifest",
-          `Invalid workspace pattern '${pattern}': ${(err as Error).message}`,
-          { path: pattern, recoverable: true }
+          `Invalid workspace pattern '${item.pattern}': ${(err as Error).message}`,
+          { path: item.pattern, recoverable: true }
         )
       );
     }
   }
 
-  return [...new Set(dirs)].sort();
+  return dirToPatterns;
+}
+
+/**
+ * Expand workspace glob patterns into actual directories relative to workspace root.
+ */
+export function expandWorkspacePatterns(
+  patterns: string[],
+  workspaceRoot: string,
+  diagnostics: ScannerDiagnostic[]
+): string[] {
+  const items = patterns.map((p) => ({ source: "workspace", pattern: p }));
+  const map = expandWorkspacePatternsWithProvenance(items, workspaceRoot, diagnostics);
+  return [...map.keys()].sort();
 }
 
 function expandPattern(pattern: string, root: string): string[] {

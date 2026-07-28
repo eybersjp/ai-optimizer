@@ -97,7 +97,13 @@ export class ProjectScanner {
       diagnostics: [],
       manifests: [],
       workspacePackages: [],
+      repositoryUnits: [],
+      expertPacks: [],
+      applications: [],
+      libraries: [],
+      configurationUnits: [],
       packageGraph: { nodes: [], edges: [] },
+      technologies: [],
       gitSummary: null,
       architectureFindings: [],
       languages: new Set(),
@@ -120,7 +126,27 @@ export class ProjectScanner {
       context.assertions.push(...result.assertions);
       context.diagnostics.push(...result.diagnostics);
       context.manifests.push(...(result as any).manifests ?? []);
-      context.workspacePackages.push(...(result as any).workspacePackages ?? []);
+      if ((result as any).workspacePackages) {
+        context.workspacePackages = (result as any).workspacePackages;
+      }
+      if ((result as any).repositoryUnits) {
+        context.repositoryUnits = (result as any).repositoryUnits;
+      }
+      if ((result as any).expertPacks) {
+        context.expertPacks = (result as any).expertPacks;
+      }
+      if ((result as any).applications) {
+        context.applications = (result as any).applications;
+      }
+      if ((result as any).libraries) {
+        context.libraries = (result as any).libraries;
+      }
+      if ((result as any).configurationUnits) {
+        context.configurationUnits = (result as any).configurationUnits;
+      }
+      if ((result as any).technologies) {
+        context.technologies = (result as any).technologies;
+      }
       if ((result as any).packageGraph) {
         context.packageGraph = (result as any).packageGraph;
       }
@@ -218,9 +244,15 @@ export class ProjectScanner {
         diagnostics: context.diagnostics,
         manifests: context.manifests,
         workspacePackages: context.workspacePackages,
+        repositoryUnits: context.repositoryUnits,
+        expertPacks: context.expertPacks,
+        applications: context.applications,
+        libraries: context.libraries,
+        configurationUnits: context.configurationUnits,
         packageGraph: context.packageGraph,
         gitSummary: context.gitSummary,
         architectureFindings: context.architectureFindings,
+        technologies: context.technologies,
         languages: [...context.languages].sort(),
         frameworks: Object.fromEntries(context.frameworks),
         timing: context.timing,

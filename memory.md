@@ -60,19 +60,13 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 5. **CLI ran fresh scan+classify on every command** — All 9 CLI commands and all 7 daemon endpoints now load canonical identity and pass the same `projectId` through classification and compilation.
 6. **Inconsistent project IDs in checked-in state** — The current repository had `prj_HJCZZU3X` (managed-artifacts) and `prj_5IKAG2Z3` (project-profile). Reconciled to `prj_HJCZZU3X` as canonical with `prj_5IKAG2Z3` as a superseded alias in `.ai-optimize/project.json`.
 
-### Resolved (Milestone 3)
-7. **Shallow Scanner & Missing Multi-Pass Intelligence** — Refactored `@ai-optimize/project-scanner` into an evidence-backed 5-pass repository intelligence engine. Implemented bounded filesystem discovery (Pass 1), manifest/technology parsing for JS/TS/Python/Rust/Docker/Firebase/Supabase (Pass 2), package graph and monorepo topology discovery (Pass 3), safe Git intelligence (Pass 4), and deterministic architectural synthesis (Pass 5).
-8. **Express misclassified as Fastify** — Corrected defect where Express was reported as Fastify in scanner framework detection rules.
-9. **Absolute path leaking in profile** — Replaced machine-specific absolute `project.root` in generated profiles with portable repository-relative `"."`.
-
-### Remaining Defects
-10. **Invalid JSON syntax in VSCode adapter**: `VSCodeAdapter` generates managed blocks with `//` single-line comments in `.vscode/settings.json`, causing strict JSON parsers to fail.
-11. **Lack of stdio MCP Transport**: `@ai-optimize/mcp-server` implements tool logic but lacks a stdio server entry point for external AI host connections.
+### Resolved (Milestone 3A)
+10. **Workspace Discovery Overcount & Unproven Nested Evidence** — Resolved pnpm workspace discovery overcount (reconciled from 34 to 17 authoritative workspace packages: root `.` + 3 apps + 13 packages) by filtering non-package directories (`expert-packs/*`, `packages/adapters`) and deduplicating pattern matches. Added `RepositoryUnit`, `TechnologyFinding` with explicit package ownership (`owningPackage`, `owningPackageDir`, `sourcePath`, `evidenceId`), diagnostic codes for workspace duplicates/unresolved dependencies, and updated CLI `--summary` option. Proved package-owned detection for React, Vite, Fastify, Commander, Vitest, node:sqlite, TypeScript, and pnpm while confirming Express is absent.
 
 ---
 
 ## Decisions Made During Implementation
-- Added `packages/mcp-server/package.json` to integrate `@ai-optimize/mcp-server` into the 16-project pnpm workspace.
+- Added `packages/mcp-server/package.json` to integrate `@ai-optimize/mcp-server` into the pnpm workspace.
 - Updated root `package.json` `lint` command to `pnpm -r exec tsc --noEmit`.
 - Annotated callback signatures in `tests/compiler.test.ts` and explicit ESM file extension in `apps/dashboard/src/main.tsx`.
 - Created and checked out baseline development branch `dev/trustworthy-core-v0.1.1`.
@@ -81,6 +75,7 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 - Selected `prj_HJCZZU3X` as the canonical project ID for this repository because it is the consistent identity across all five managed-artifact records (`managed-artifacts.json`), while `prj_5IKAG2Z3` only appeared in a single generated profile.
 - Identity tests operate on isolated temporary directories (`fs.mkdtempSync`) to avoid depending on the developer's actual checkout path or committed local runtime state.
 - Structured `@ai-optimize/project-scanner` into explicit passes (`filesystem`, `manifest`, `topology`, `git`, `architecture`) with typed context, diagnostic codes, safety bounds, and deterministic output.
+- Reconciled pnpm workspace discovery in Pass 2 & Pass 3 by tracking glob pattern provenance (`matchedBy`), deduplicating package manifests by canonical relative directory, and classifying non-package folders containing `pack.yaml` or configuration files into `expertPacks` and `repositoryUnits`.
 
 ---
 
@@ -95,3 +90,4 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 - **Baseline Milestone**: Established trustworthy core development baseline (`dev/trustworthy-core-v0.1.1`). 100% passing build (`pnpm build`), test suite (`pnpm test`), and typecheck (`pnpm lint`).
 - **Milestone 2 (Stable and Deterministic Project Identity)**: Created `@ai-optimize/project-identity` package with crypto-based ID generation, stable assertion IDs, deterministic compilation, legacy migration, controlled reconciliation, typed identity errors, and 17+ comprehensive identity tests. Branch: `dev/trustworthy-core-v0.1.1`.
 - **Milestone 3 (Evidence-Backed Multi-Pass Repository Scanner)**: Refactored `@ai-optimize/project-scanner` into a 5-pass bounded intelligence engine, supporting JS/TS, Python, Rust, Docker, Firebase, Supabase, package graphs, safe Git inspection, deterministic assertion IDs via `@ai-optimize/project-identity`, and a 26-case fixture-based test suite. Branch: `dev/trustworthy-core-v0.1.1`.
+- **Milestone 3A (Workspace Discovery Reconciliation and Self-Scan Proof)**: Reconciled workspace package discovery to 17 authoritative pnpm workspace packages (matching package graph node count), added repository unit and package-owned technology findings, added CLI `ai-optimize analyse --summary`, surfaced diagnostic codes for workspace duplicates/unresolved dependencies, and updated tests. Branch: `dev/trustworthy-core-v0.1.1`.

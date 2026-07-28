@@ -16,12 +16,20 @@ import type {
   ScannerPassResult,
   RepositoryFile,
   ManifestFinding,
-  WorkspacePackage
+  WorkspacePackage,
+  RepositoryUnit,
+  RepositoryUnitType,
+  TechnologyFinding
 } from "../contracts.js";
 import type { ScannerConfiguration } from "../configuration.js";
 import { EvidenceEngine } from "@ai-optimize/evidence-engine";
 import { diagnostic, DiagnosticCode } from "../diagnostics.js";
-import { parsePnpmWorkspace, expandWorkspacePatterns } from "./pnpm-workspace.js";
+import {
+  parsePnpmWorkspace,
+  expandWorkspacePatterns,
+  expandWorkspacePatternsWithProvenance,
+  type WorkspacePatternSource
+} from "./pnpm-workspace.js";
 import { detectFrameworks, type PackageJsonData } from "./package-json.js";
 import { detectFirebase } from "./firebase.js";
 import { detectSupabase } from "./supabase.js";
@@ -86,7 +94,6 @@ export class ManifestPass implements ScannerPass {
     const diagnosticsList = [...context.diagnostics];
     const frameworks = new Map<string, string>();
     const languages: Set<string> = new Set();
-    const workspacePackages: WorkspacePackage[] = [];
     let manifestsParsed = 0;
 
     // Phase 1: Discover manifests from the file list
@@ -125,95 +132,393 @@ export class ManifestPass implements ScannerPass {
       }
     }
 
-    // Phase 3: Detect workspace packages from manifest data
-    let workspacePatterns: string[] = [];
+    // Phase 3: Discover workspace patterns and pattern sources
+    const patternSources: WorkspacePatternSource[] = [];
     const pnpmWorkspaceManifest = manifests.find((m) => m.type === "pnpm-workspace.yaml");
     if (pnpmWorkspaceManifest && pnpmWorkspaceManifest.parsed && pnpmWorkspaceManifest.raw) {
       const workspaceConfig = pnpmWorkspaceManifest.raw as { packages?: string[] } | undefined;
       if (Array.isArray(workspaceConfig?.packages)) {
-        workspacePatterns.push(...workspaceConfig.packages);
-      }
-    }
-
-    // Fallback: check root package.json for "workspaces" field if no pnpm-workspace patterns
-    if (workspacePatterns.length === 0) {
-      const rootPkgManifest = manifests.find((m) => m.relativePath === "package.json");
-      if (rootPkgManifest && rootPkgManifest.parsed && rootPkgManifest.raw) {
-        const pkgData = rootPkgManifest.raw as PackageJsonData & { workspaces?: string[] | { packages?: string[] } };
-        if (Array.isArray(pkgData.workspaces)) {
-          workspacePatterns.push(...pkgData.workspaces);
-        } else if (pkgData.workspaces && Array.isArray((pkgData.workspaces as any).packages)) {
-          workspacePatterns.push(...(pkgData.workspaces as any).packages);
+        for (const p of workspaceConfig.packages) {
+          patternSources.push({ source: "pnpm-workspace.yaml", pattern: p });
         }
       }
     }
 
-    if (workspacePatterns.length > 0) {
-      const expanded = expandWorkspacePatterns(
-        workspacePatterns,
-        context.root,
-        diagnosticsList
-      );
+    // Check root package.json for "workspaces" field
+    const rootPkgManifest = manifests.find((m) => m.relativePath === "package.json");
+    if (rootPkgManifest && rootPkgManifest.parsed && rootPkgManifest.raw) {
+      const pkgData = rootPkgManifest.raw as PackageJsonData & { workspaces?: string[] | { packages?: string[] } };
+      let pkgWorkspaces: string[] = [];
+      if (Array.isArray(pkgData.workspaces)) {
+        pkgWorkspaces = pkgData.workspaces;
+      } else if (pkgData.workspaces && Array.isArray((pkgData.workspaces as any).packages)) {
+        pkgWorkspaces = (pkgData.workspaces as any).packages;
+      }
+      for (const p of pkgWorkspaces) {
+        patternSources.push({ source: "package.json:workspaces", pattern: p });
+      }
+    }
 
-      for (const pkgDir of expanded) {
-        const pkgJsonPath = path.join(context.root, pkgDir, "package.json");
-        if (fs.existsSync(pkgJsonPath)) {
-          const pkg = this.parseWorkspacePackage(pkgJsonPath, pkgDir);
-          if (pkg) {
-            workspacePackages.push(pkg);
-          }
-        } else {
+    const dirToPatterns = expandWorkspacePatternsWithProvenance(
+      patternSources,
+      context.root,
+      diagnosticsList
+    );
+
+    const workspacePackagesMap = new Map<string, WorkspacePackage>();
+    const repositoryUnitsMap = new Map<string, RepositoryUnit>();
+    const expertPacksMap = new Map<string, RepositoryUnit>();
+    const applicationsMap = new Map<string, RepositoryUnit>();
+    const librariesMap = new Map<string, RepositoryUnit>();
+    const configurationUnitsMap = new Map<string, RepositoryUnit>();
+
+    // Process matched workspace directories
+    for (const [pkgDir, patternTags] of dirToPatterns.entries()) {
+      const cleanDir = pkgDir === "" ? "." : pkgDir.replace(/\\/g, "/");
+      const pkgJsonPath = path.join(context.root, cleanDir, "package.json");
+
+      if (fs.existsSync(pkgJsonPath)) {
+        if (workspacePackagesMap.has(cleanDir)) {
+          const existing = workspacePackagesMap.get(cleanDir)!;
+          const mergedTags = [...new Set([...(existing.matchedBy ?? []), ...patternTags])];
+          existing.matchedBy = mergedTags;
           diagnosticsList.push(
             diagnostic(
-              DiagnosticCode.WORKSPACE_PACKAGE_MISSING_MANIFEST,
-              "warning",
+              DiagnosticCode.WORKSPACE_DUPLICATE_MATCH,
+              "info",
               this.id,
-              `Workspace package at '${pkgDir}' has no package.json`,
-              { path: pkgDir, recoverable: true }
+              `Workspace directory '${cleanDir}' matched by multiple patterns: ${patternTags.join(", ")}`,
+              { path: cleanDir, recoverable: true, details: { directory: cleanDir, patterns: patternTags } }
+            )
+          );
+        } else {
+          const pkg = this.parseWorkspacePackage(pkgJsonPath, cleanDir);
+          if (pkg) {
+            pkg.matchedBy = [...patternTags];
+            workspacePackagesMap.set(cleanDir, pkg);
+          }
+        }
+      } else {
+        diagnosticsList.push(
+          diagnostic(
+            DiagnosticCode.WORKSPACE_PACKAGE_MISSING_MANIFEST,
+            "info",
+            this.id,
+            `Workspace directory '${cleanDir}' has no package.json`,
+            { path: cleanDir, recoverable: true }
+          )
+        );
+
+        // Check if this directory is an expert pack or other unit
+        const packYamlPath = path.join(context.root, cleanDir, "pack.yaml");
+        if (fs.existsSync(packYamlPath)) {
+          const packName = path.basename(cleanDir);
+          const unit: RepositoryUnit = {
+            id: cleanDir,
+            name: packName,
+            relativeDir: cleanDir,
+            type: "expert-pack",
+            configPath: path.join(cleanDir, "pack.yaml").replace(/\\/g, "/"),
+            roles: ["expert-pack"]
+          };
+          expertPacksMap.set(cleanDir, unit);
+          repositoryUnitsMap.set(cleanDir, unit);
+        } else {
+          const unit: RepositoryUnit = {
+            id: cleanDir,
+            name: path.basename(cleanDir),
+            relativeDir: cleanDir,
+            type: "configuration",
+            roles: ["configuration"]
+          };
+          configurationUnitsMap.set(cleanDir, unit);
+          repositoryUnitsMap.set(cleanDir, unit);
+        }
+      }
+    }
+
+    // Always include root package.json if it exists
+    const rootPkgJsonPath = path.join(context.root, "package.json");
+    if (fs.existsSync(rootPkgJsonPath) && !workspacePackagesMap.has(".")) {
+      const rootPkg = this.parseWorkspacePackage(rootPkgJsonPath, ".");
+      if (rootPkg) {
+        rootPkg.matchedBy = ["root:package.json"];
+        workspacePackagesMap.set(".", rootPkg);
+      }
+    }
+
+    // Sort workspace packages deterministically by relativeDir
+    const workspacePackages = [...workspacePackagesMap.values()].sort((a, b) =>
+      a.relativeDir.localeCompare(b.relativeDir)
+    );
+
+    // Diagnostics for package manifests outside declared workspace patterns
+    for (const mf of manifests) {
+      if (mf.type === "package.json") {
+        const manifestDir = path.dirname(mf.relativePath).replace(/\\/g, "/");
+        const cleanDir = manifestDir === "." ? "." : manifestDir;
+        if (!workspacePackagesMap.has(cleanDir)) {
+          diagnosticsList.push(
+            diagnostic(
+              DiagnosticCode.WORKSPACE_MANIFEST_OUTSIDE_DECLARATION,
+              "info",
+              this.id,
+              `Package manifest at '${mf.relativePath}' is outside declared workspace patterns`,
+              { path: mf.relativePath, recoverable: true }
             )
           );
         }
       }
     }
 
-    // Always include root package.json if it exists and wasn't already added
-    const rootPkgJsonPath = path.join(context.root, "package.json");
-    if (fs.existsSync(rootPkgJsonPath) && !workspacePackages.some((p) => p.relativeDir === "." || p.relativeDir === "")) {
-      const rootPkg = this.parseWorkspacePackage(rootPkgJsonPath, ".");
-      if (rootPkg) {
-        workspacePackages.unshift(rootPkg);
-      }
-    }
-
-    // Phase 4: Extract frameworks from all package.json manifests
-    for (const mf of manifests) {
-      if (mf.type === "package.json" && typeof mf.raw === "object" && mf.raw !== null) {
-        const pkgData = mf.raw as PackageJsonData;
-        const allDeps = { ...pkgData.dependencies, ...pkgData.devDependencies };
-        if (allDeps["typescript"]) {
-          languages.add("typescript");
-        }
-        const detected = detectFrameworks(pkgData, mf.relativePath);
-        for (const fw of detected) {
-          if (!frameworks.has(fw.id)) {
-            frameworks.set(fw.id, fw.version ?? "unknown");
-          }
+    // Discover expert packs from file list if not already discovered
+    for (const file of context.files) {
+      if (file.name === "pack.yaml" || file.relativePath.endsWith("/pack.yaml")) {
+        const packDir = path.dirname(file.relativePath).replace(/\\/g, "/");
+        if (!expertPacksMap.has(packDir)) {
+          const unit: RepositoryUnit = {
+            id: packDir,
+            name: path.basename(packDir),
+            relativeDir: packDir,
+            type: "expert-pack",
+            configPath: file.relativePath,
+            roles: ["expert-pack"]
+          };
+          expertPacksMap.set(packDir, unit);
+          repositoryUnitsMap.set(packDir, unit);
         }
       }
     }
 
-    // Inspect source files for native node:sqlite or sqlite imports
+    // Build RepositoryUnits, Applications, Libraries
+    for (const pkg of workspacePackages) {
+      let type: RepositoryUnitType = "workspace-package";
+      if (pkg.role === "frontend" || pkg.role === "cli" || pkg.role === "daemon-service" || pkg.role === "application") {
+        type = "application";
+      } else if (pkg.role === "library" || pkg.role === "contracts" || pkg.role === "adapter" || pkg.role === "test") {
+        type = "library";
+      }
+
+      const unit: RepositoryUnit = {
+        id: pkg.relativeDir,
+        name: pkg.name,
+        relativeDir: pkg.relativeDir,
+        type,
+        configPath: pkg.manifestPath,
+        packageName: pkg.name,
+        roles: [pkg.role ?? "unknown"]
+      };
+
+      repositoryUnitsMap.set(pkg.relativeDir, unit);
+      if (type === "application") applicationsMap.set(pkg.relativeDir, unit);
+      if (type === "library") librariesMap.set(pkg.relativeDir, unit);
+    }
+
+    const repositoryUnits = [...repositoryUnitsMap.values()].sort((a, b) => a.relativeDir.localeCompare(b.relativeDir));
+    const expertPacks = [...expertPacksMap.values()].sort((a, b) => a.relativeDir.localeCompare(b.relativeDir));
+    const applications = [...applicationsMap.values()].sort((a, b) => a.relativeDir.localeCompare(b.relativeDir));
+    const libraries = [...librariesMap.values()].sort((a, b) => a.relativeDir.localeCompare(b.relativeDir));
+    const configurationUnits = [...configurationUnitsMap.values()].sort((a, b) => a.relativeDir.localeCompare(b.relativeDir));
+
+    // Phase 4: Extract technologies with package ownership
+    const technologiesMap = new Map<string, TechnologyFinding>();
+
+    for (const pkg of workspacePackages) {
+      const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+      if (allDeps["next"]) {
+        frameworks.set("nextjs", allDeps["next"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "nextjs",
+          name: "Next.js",
+          category: "framework",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["next"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `Next.js detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`nextjs:${pkg.name}`, tech);
+      }
+
+      if (allDeps["express"]) {
+        frameworks.set("express", allDeps["express"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "express",
+          name: "Express",
+          category: "framework",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["express"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `Express detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`express:${pkg.name}`, tech);
+      }
+
+      if (allDeps["react"] || allDeps["react-dom"]) {
+        frameworks.set("react", allDeps["react"] ?? allDeps["react-dom"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "react",
+          name: "React",
+          category: "framework",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["react"] ?? allDeps["react-dom"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `React detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`react:${pkg.name}`, tech);
+      }
+
+      if (allDeps["vite"]) {
+        frameworks.set("vite", allDeps["vite"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "vite",
+          name: "Vite",
+          category: "tool",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["vite"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `Vite detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`vite:${pkg.name}`, tech);
+      }
+
+      if (allDeps["fastify"]) {
+        frameworks.set("fastify", allDeps["fastify"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "fastify",
+          name: "Fastify",
+          category: "framework",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["fastify"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `Fastify detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`fastify:${pkg.name}`, tech);
+      }
+
+      if (allDeps["commander"]) {
+        frameworks.set("commander", allDeps["commander"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "commander",
+          name: "Commander",
+          category: "library",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["commander"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `Commander detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`commander:${pkg.name}`, tech);
+      }
+
+      if (allDeps["vitest"]) {
+        frameworks.set("vitest", allDeps["vitest"] ?? "unknown");
+        const tech: TechnologyFinding = {
+          id: "vitest",
+          name: "Vitest",
+          category: "tool",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["vitest"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `Vitest detected in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`vitest:${pkg.name}`, tech);
+      }
+
+      if (allDeps["typescript"] || allDeps["@types/node"]) {
+        languages.add("typescript");
+        const tech: TechnologyFinding = {
+          id: "typescript",
+          name: "TypeScript",
+          category: "language",
+          status: "observed",
+          owningPackage: pkg.name,
+          owningPackageDir: pkg.relativeDir,
+          sourcePath: pkg.manifestPath,
+          version: allDeps["typescript"],
+          confidence: 1.0,
+          evidenceId: "",
+          explanation: `TypeScript dependency observed in package '${pkg.name}' (${pkg.manifestPath})`
+        };
+        technologiesMap.set(`typescript:${pkg.name}`, tech);
+      }
+    }
+
+    // Inspect source files for native node:sqlite import
     for (const file of context.files) {
       if ((file.extension === ".ts" || file.extension === ".js") && file.sizeBytes <= this.config.maxTextInspectionSize) {
         const fullPath = path.join(context.root, file.relativePath);
         try {
           const content = fs.readFileSync(fullPath, "utf-8");
-          if (content.includes("node:sqlite") || content.includes("sqlite3") || content.includes("better-sqlite3")) {
+          if (content.includes('from "node:sqlite"') || content.includes("require('node:sqlite')") || content.includes('require("node:sqlite")') || content.includes("node:sqlite")) {
             frameworks.set("sqlite", "native");
+            let owningPkg = workspacePackages.find((p) => p.relativeDir !== "." && file.relativePath.startsWith(p.relativeDir + "/"));
+            if (!owningPkg) owningPkg = workspacePackages.find((p) => p.relativeDir === ".");
+
+            const tech: TechnologyFinding = {
+              id: "node:sqlite",
+              name: "node:sqlite",
+              category: "database",
+              status: "observed",
+              owningPackage: owningPkg?.name ?? "@ai-optimize/memory-engine",
+              owningPackageDir: owningPkg?.relativeDir ?? "packages/memory-engine",
+              sourcePath: file.relativePath,
+              version: "native",
+              confidence: 1.0,
+              evidenceId: "",
+              explanation: `Native node:sqlite import observed in '${file.relativePath}' (${owningPkg?.name ?? "memory-engine"})`
+            };
+            technologiesMap.set("node:sqlite", tech);
             break;
           }
         } catch { /* skip unreadable */ }
       }
+    }
+
+    // pnpm workspace technology evidence
+    if (pnpmWorkspaceManifest) {
+      const rootPkg = workspacePackages.find((p) => p.relativeDir === ".");
+      const tech: TechnologyFinding = {
+        id: "pnpm",
+        name: "pnpm",
+        category: "tool",
+        status: "observed",
+        owningPackage: rootPkg?.name ?? "root",
+        owningPackageDir: ".",
+        sourcePath: "pnpm-workspace.yaml",
+        version: "workspace",
+        confidence: 1.0,
+        evidenceId: "",
+        explanation: `pnpm workspace configuration observed with ${workspacePackages.length} packages`
+      };
+      technologiesMap.set("pnpm", tech);
     }
 
     // Phase 5: Detect languages from file extensions
@@ -222,24 +527,33 @@ export class ManifestPass implements ScannerPass {
       if (lang) languages.add(lang);
     }
 
-    // Add TypeScript if tsconfig found
     if (manifestFilePaths.has("tsconfig.json") || manifests.some((m) => m.type.startsWith("tsconfig"))) {
       languages.add("typescript");
     }
 
-    // Detection assertions
-    for (const [fw, ver] of frameworks) {
-      evidence.createAssertion({
-        subject: "stack",
-        predicate: `framework-${fw}`,
-        value: { framework: fw, version: ver },
+    // Convert technologies to array and attach evidence IDs
+    const technologies = [...technologiesMap.values()].sort((a, b) => a.id.localeCompare(b.id));
+
+    for (const tech of technologies) {
+      const ast = evidence.createAssertion({
+        subject: `technology-${tech.id}`,
+        predicate: "observed",
+        value: {
+          technology: tech.id,
+          owningPackage: tech.owningPackage,
+          owningPackageDir: tech.owningPackageDir,
+          sourcePath: tech.sourcePath,
+          version: tech.version
+        },
         status: "observed",
-        confidence: 1.0,
-        sources: [{ file: ".", reason: `Detected framework '${fw}' from manifest` }],
-        explanation: `Framework '${fw}' detected with version '${ver}'`
+        confidence: tech.confidence,
+        sources: [{ file: tech.sourcePath, reason: tech.explanation }],
+        explanation: tech.explanation
       });
+      tech.evidenceId = ast.id;
     }
 
+    // Primary language assertions
     for (const lang of languages) {
       evidence.createAssertion({
         subject: "stack",
@@ -252,7 +566,7 @@ export class ManifestPass implements ScannerPass {
       });
     }
 
-    // Detect supabase from files
+    // Detect Supabase
     const supabaseInfo = detectSupabase(
       context.files.map((f) => f.relativePath),
       manifests
@@ -289,7 +603,7 @@ export class ManifestPass implements ScannerPass {
       }
     }
 
-    // Determine primary vs secondary languages
+    // Primary languages synthesis
     const primaryLanguages = [...languages].filter((l) =>
       ["typescript", "javascript", "python", "rust", "go", "java"].includes(l)
     );
@@ -312,6 +626,12 @@ export class ManifestPass implements ScannerPass {
       diagnostics: diagnosticsList,
       manifests,
       workspacePackages,
+      repositoryUnits,
+      expertPacks,
+      applications,
+      libraries,
+      configurationUnits,
+      technologies,
       languages,
       frameworks,
       manifestsParsed

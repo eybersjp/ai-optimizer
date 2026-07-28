@@ -4,12 +4,12 @@
 
 The following components are fully operational, tested, and integrated into the build pipeline:
 
-- **Monorepo Architecture**: 16 workspace projects managed via pnpm, compiled using TypeScript with strict mode.
+- **Monorepo Architecture**: 17 workspace projects managed via pnpm (1 root + 3 apps + 13 packages), compiled using TypeScript with strict mode.
 - **Provider-Neutral Domain Contracts (`@ai-optimize/contracts`)**: Complete Zod schemas and type definitions for project profiles, evidence assertions, expert packs, compiler output, activation results, and adapter interfaces.
-- **5-Pass Repository Scanner (`@ai-optimize/project-scanner`)**:
+- **5-Pass Evidence-Backed Repository Scanner (`@ai-optimize/project-scanner`)**:
   - Pass 1 (Safe Filesystem Walk): Bounded file discovery ignoring build outputs and temp state, with symlink loop detection and path normalisation.
-  - Pass 2 (Manifests & Tech): Manifest parsing (`package.json`, `pnpm-workspace.yaml`, `tsconfig.json`, `pyproject.toml`, `requirements.txt`, `Cargo.toml`, `Dockerfile`, `compose.yaml`, `firebase.json`, `supabase/config.toml`, etc.) mapping 13+ languages and 17+ frameworks (`react`, `nextjs`, `vite`, `express`, `fastify`, `vitest`, `sqlite`, `supabase`, `firebase`, etc.).
-  - Pass 3 (Topology & Graph): Monorepo and workspace discovery, package dependency graph (`nodes`, `edges`), package role classification, and topology detection (`single-package`, `monorepo`, `multi-application`, `mixed-language`).
+  - Pass 2 (Manifests & Tech): Discovers and parses manifests (`package.json`, `pnpm-workspace.yaml`, `tsconfig.json`, `pyproject.toml`, `requirements.txt`, `Cargo.toml`, `Dockerfile`, `compose.yaml`, `firebase.json`, `supabase/config.toml`, etc.) mapping 13+ languages and 17+ frameworks (`react`, `nextjs`, `vite`, `express`, `fastify`, `vitest`, `sqlite`, `supabase`, `firebase`, etc.) with explicit package ownership (`owningPackage`, `owningPackageDir`, `sourcePath`, `evidenceId`). Deduplicates pnpm workspace package discovery (17 authoritative workspace packages) and distinguishes non-package repository units, expert packs, applications, libraries, and configuration units.
+  - Pass 3 (Topology & Graph): Expands workspace patterns with pattern provenance (`matchedBy`), builds package graph (`nodes`, `edges`), enforces graph invariants, assigns package roles, and detects topology type (`single-package`, `monorepo`, `multi-application`, `mixed-language`).
   - Pass 4 (Safe Git Intelligence): Non-interpolated child process execution collecting branch, HEAD, commit SHA, dirty state, redacted remotes, and recent commits (max 10).
   - Pass 5 (Deterministic Architectural Synthesis): Rule-based architectural synthesis (`monorepo`, `frontend-backend-separation`, `shared-contracts`, `adapter-architecture`, `test-framework`, `database-presence`) with explicit confidence scores and supporting evidence references.
 - **Traceable Assertion Engine (`@ai-optimize/evidence-engine`)**: Assertion builder storing status (`observed`, `inferred`, `recommended`, `unresolved`), confidence scores, and source file/line provenance. Deterministic assertion IDs generated via `@ai-optimize/project-identity`.

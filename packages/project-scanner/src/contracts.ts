@@ -66,8 +66,20 @@ export interface ScannerContext {
   manifests: ManifestFinding[];
   /** Workspace packages discovered (populated by manifest/topology passes). */
   workspacePackages: WorkspacePackage[];
+  /** Repository units discovered (package and non-package units). */
+  repositoryUnits: RepositoryUnit[];
+  /** Expert packs discovered containing pack.yaml. */
+  expertPacks: RepositoryUnit[];
+  /** Detected runnable application packages. */
+  applications: RepositoryUnit[];
+  /** Detected reusable library packages. */
+  libraries: RepositoryUnit[];
+  /** Configuration-only units. */
+  configurationUnits: RepositoryUnit[];
   /** Package graph (populated by topology pass). */
   packageGraph: PackageGraph;
+  /** Package-owned technology findings. */
+  technologies: TechnologyFinding[];
   /** Git summary (populated by git pass). */
   gitSummary: GitSummary | null;
   /** Architecture findings (populated by architecture pass). */
@@ -144,6 +156,10 @@ export interface ManifestFinding {
 // Workspace package
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Workspace package
+// ---------------------------------------------------------------------------
+
 export interface WorkspacePackage {
   /** Package name (from manifest). */
   name: string;
@@ -175,6 +191,8 @@ export interface WorkspacePackage {
   entryPoints: string[];
   /** Detected package role. */
   role?: PackageRole;
+  /** Provenance of workspace pattern matches that discovered this package. */
+  matchedBy?: string[];
 }
 
 export type PackageRole =
@@ -190,6 +208,65 @@ export type PackageRole =
   | "expert-pack"
   | "database"
   | "unknown";
+
+// ---------------------------------------------------------------------------
+// Repository unit (distinct from workspace package)
+// ---------------------------------------------------------------------------
+
+export type RepositoryUnitType =
+  | "workspace-package"
+  | "expert-pack"
+  | "application"
+  | "library"
+  | "configuration"
+  | "sql-migrations"
+  | "custom-unit";
+
+export interface RepositoryUnit {
+  /** Unique unit identifier / directory (e.g. "apps/cli", "expert-packs/core-software"). */
+  id: string;
+  /** Human-readable unit name. */
+  name: string;
+  /** Repository-relative directory path. */
+  relativeDir: string;
+  /** Unit classification type. */
+  type: RepositoryUnitType;
+  /** Manifest or configuration path, if applicable (e.g. "package.json", "pack.yaml"). */
+  configPath?: string;
+  /** Associated workspace package name, if this unit is a pnpm workspace package. */
+  packageName?: string;
+  /** Roles or tags assigned to this unit. */
+  roles: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Package-owned technology finding
+// ---------------------------------------------------------------------------
+
+export interface TechnologyFinding {
+  /** Technology ID (e.g. "react", "vite", "fastify", "commander", "vitest", "sqlite", "typescript", "pnpm"). */
+  id: string;
+  /** Display name (e.g. "React", "Vite", "Fastify"). */
+  name: string;
+  /** Technology category. */
+  category: "framework" | "library" | "tool" | "language" | "database" | "platform";
+  /** Observation status. */
+  status: "observed" | "inferred";
+  /** Owning workspace package name (e.g. "@ai-optimize/dashboard"), if package-owned. */
+  owningPackage?: string;
+  /** Owning package directory (e.g. "apps/dashboard"), if package-owned. */
+  owningPackageDir?: string;
+  /** Repository-relative source path (e.g. "apps/dashboard/package.json", "packages/memory-engine/src/index.ts"). */
+  sourcePath: string;
+  /** Version string, if available (e.g. "^18.3.1", "native"). */
+  version?: string;
+  /** Confidence score (0.0 to 1.0). */
+  confidence: number;
+  /** Evidence assertion ID (e.g. "ast_..."). */
+  evidenceId: string;
+  /** Supporting evidence summary/explanation. */
+  explanation: string;
+}
 
 // ---------------------------------------------------------------------------
 // Package graph
@@ -293,7 +370,7 @@ export interface ArchitectureFinding {
 }
 
 // ---------------------------------------------------------------------------
-// Full rich scan result (new format, backwards compatible via ScanResult rich field)
+// Full rich scan result
 // ---------------------------------------------------------------------------
 
 export interface NewScanResult {
@@ -303,9 +380,15 @@ export interface NewScanResult {
   diagnostics: ScannerDiagnostic[];
   manifests: ManifestFinding[];
   workspacePackages: WorkspacePackage[];
+  repositoryUnits: RepositoryUnit[];
+  expertPacks: RepositoryUnit[];
+  applications: RepositoryUnit[];
+  libraries: RepositoryUnit[];
+  configurationUnits: RepositoryUnit[];
   packageGraph: PackageGraph;
   gitSummary: GitSummary | null;
   architectureFindings: ArchitectureFinding[];
+  technologies: TechnologyFinding[];
   languages: string[];
   frameworks: Record<string, string>;
   timing: Record<string, number>;
