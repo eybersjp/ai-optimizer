@@ -1,0 +1,16 @@
+id: github
+version: 1.0.0
+name: GitHub Governance & CI/CD
+description: GitHub Actions, issue/PR templates, and repository rulesets.
+
+activation:
+  any:
+    - path: ".github/**"
+
+provides:
+  agents:
+    - devops-engineer
+  workflows:
+    - ci-cd-pipeline
+  validators:
+    - github-workflow-check

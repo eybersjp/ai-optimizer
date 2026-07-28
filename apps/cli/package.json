@@ -1,0 +1,26 @@
+{
+  "name": "@ai-optimize/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ai-optimize": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "node ./dist/index.js"
+  },
+  "dependencies": {
+    "@ai-optimize/contracts": "workspace:*",
+    "@ai-optimize/project-scanner": "workspace:*",
+    "@ai-optimize/project-classifier": "workspace:*",
+    "@ai-optimize/expert-engine": "workspace:*",
+    "@ai-optimize/recommendation-engine": "workspace:*",
+    "@ai-optimize/profile-compiler": "workspace:*",
+    "@ai-optimize/activation-engine": "workspace:*",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

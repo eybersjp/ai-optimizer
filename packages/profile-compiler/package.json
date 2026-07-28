@@ -1,0 +1,19 @@
+{
+  "name": "@ai-optimize/profile-compiler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ai-optimize/contracts": "workspace:*",
+    "@ai-optimize/adapter-claude-code": "workspace:*",
+    "@ai-optimize/adapter-vscode": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

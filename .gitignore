@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Compiled TS artifacts inside src directories
+packages/**/src/*.js
+packages/**/src/*.js.map
+packages/**/src/*.d.ts
+packages/**/src/*.d.ts.map
+apps/**/src/*.js
+apps/**/src/*.js.map
+apps/**/src/*.d.ts
+apps/**/src/*.d.ts.map
+
+# Testing & Temp
+coverage/
+temp_test_repo/
+*.log
+
+# Environment & Local Configuration
+.env
+.env.local
+.env.*.local
+*.local.json
+
+# AI Optimize Managed Runtime (Backups & Staging)
+.ai-optimize/backups/
+.ai-optimize/activation.lock
+
+# OS Files
+.DS_Store
+Thumbs.db

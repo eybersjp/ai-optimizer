@@ -1,0 +1,16 @@
+id: core-software
+version: 1.0.0
+name: Core Software Engineering
+description: Baseline software engineering standards, clean architecture, and modular design rules.
+
+activation:
+  any:
+    - path: "**/*"
+
+provides:
+  agents:
+    - software-engineer
+  workflows:
+    - code-impl
+  validators:
+    - baseline-check

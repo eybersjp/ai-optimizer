@@ -1,0 +1,26 @@
+{
+  "name": "@ai-optimize/daemon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "node ./dist/index.js",
+    "start": "node ./dist/index.js"
+  },
+  "dependencies": {
+    "@ai-optimize/contracts": "workspace:*",
+    "@ai-optimize/project-scanner": "workspace:*",
+    "@ai-optimize/project-classifier": "workspace:*",
+    "@ai-optimize/expert-engine": "workspace:*",
+    "@ai-optimize/recommendation-engine": "workspace:*",
+    "@ai-optimize/profile-compiler": "workspace:*",
+    "@ai-optimize/activation-engine": "workspace:*",
+    "@ai-optimize/memory-engine": "workspace:*",
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

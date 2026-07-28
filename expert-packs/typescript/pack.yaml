@@ -1,0 +1,17 @@
+id: typescript
+version: 1.0.0
+name: TypeScript Engineering
+description: Strict TypeScript type checking, modern ECMAScript features, and module conventions.
+
+activation:
+  any:
+    - path: "tsconfig.json"
+    - dependency: "typescript"
+
+provides:
+  agents:
+    - typescript-engineer
+  workflows:
+    - typecheck
+  validators:
+    - tsc-no-emit

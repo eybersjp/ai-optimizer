@@ -1,0 +1,19 @@
+id: testing
+version: 1.0.0
+name: Quality Assurance & Testing
+description: Unit testing, integration testing, Vitest/Jest configuration, and test-driven development.
+
+activation:
+  any:
+    - dependency: "vitest"
+    - dependency: "jest"
+    - dependency: "@playwright/test"
+    - path: "vitest.config.*"
+
+provides:
+  agents:
+    - verification-engineer
+  workflows:
+    - run-unit-tests
+  validators:
+    - test-suite-pass

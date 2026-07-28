@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": {
+    "id": "prj_5IKAG2Z3",
+    "name": "ai-optimizer",
+    "root": "C:\\Users\\SSTECH\\developments\\ai-optimizer",
+    "archetype": "modular-monolith",
+    "maturity": "active-development"
+  },
+  "stack": {
+    "languages": [
+      "typescript"
+    ],
+    "frameworks": [
+      "vitest"
+    ],
+    "packageManager": "pnpm"
+  },
+  "architecture": {
+    "style": "modular-monolith",
+    "tenancy": "single-tenant",
+    "confidence": 0.88
+  },
+  "experts": {
+    "enabled": [
+      "core-software",
+      "typescript",
+      "security",
+      "testing"
+    ]
+  },
+  "agents": {
+    "primary": "project-orchestrator",
+    "implementation": "software-engineer",
+    "review": "code-reviewer",
+    "verification": "verification-engineer"
+  },
+  "context": {
+    "strategy": "task-scoped",
+    "maximumPreloadTokens": 12000,
+    "dynamicRetrieval": true
+  },
+  "qualityGates": {
+    "typecheck": true,
+    "lint": true,
+    "unitTests": true,
+    "browserVerification": false,
+    "securityReview": true
+  }
+}

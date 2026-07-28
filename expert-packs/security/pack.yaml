@@ -1,0 +1,19 @@
+id: security
+version: 1.0.0
+name: Application Security
+description: Application security auditing, secret scanning, authentication checks, and vulnerability prevention.
+
+activation:
+  any:
+    - dependency: "@supabase/supabase-js"
+    - dependency: "firebase"
+    - path: "src/auth/**"
+
+provides:
+  agents:
+    - security-reviewer
+  workflows:
+    - secret-scan
+    - auth-audit
+  validators:
+    - no-client-service-role-key
