@@ -18,6 +18,7 @@
     "@ai-optimize/recommendation-engine": "workspace:*",
     "@ai-optimize/profile-compiler": "workspace:*",
     "@ai-optimize/activation-engine": "workspace:*",
+    "@ai-optimize/project-identity": "workspace:*",
     "commander": "^13.1.0"
   },
   "devDependencies": {

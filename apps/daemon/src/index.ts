@@ -7,6 +7,11 @@ import { RecommendationEngine } from "@ai-optimize/recommendation-engine";
 import { ProfileCompiler } from "@ai-optimize/profile-compiler";
 import { ActivationEngine } from "@ai-optimize/activation-engine";
 import { MemoryEngine } from "@ai-optimize/memory-engine";
+import {
+  loadIdentity,
+  createIdentity,
+  IdentityError
+} from "@ai-optimize/project-identity";
 
 const fastify = Fastify({ logger: true });
 
@@ -23,13 +28,30 @@ const expertPacksDir = path.resolve("../../expert-packs");
 expertEngine.loadBuiltinPacks(expertPacksDir);
 memoryEngine.init();
 
+/**
+ * Load canonical project identity for a given root.
+ * Creates a new identity if the project is not yet registered.
+ */
+async function loadOrCreateIdentity(root: string) {
+  try {
+    const identity = await loadIdentity(root);
+    return identity;
+  } catch (err) {
+    if (err instanceof IdentityError && err.code === "PROJECT_NOT_REGISTERED") {
+      return createIdentity(root);
+    }
+    throw err;
+  }
+}
+
 fastify.post("/api/v1/projects/init", async (request, reply) => {
   const { path: projectPath } = request.body as { path: string };
   const root = path.resolve(projectPath || ".");
+  const identity = await loadOrCreateIdentity(root);
   const scanResult = scanner.scan(root);
-  const profile = classifier.classify(scanResult);
+  const profile = classifier.classify(scanResult, { projectId: identity.projectId });
 
-  memoryEngine.recordEvent(root, "PROJECT_REGISTERED", profile.project.id, { name: profile.project.name });
+  memoryEngine.recordEvent(root, "PROJECT_REGISTERED", identity.projectId, { name: profile.project.name });
 
   return { success: true, profile };
 });
@@ -37,8 +59,9 @@ fastify.post("/api/v1/projects/init", async (request, reply) => {
 fastify.get("/api/v1/projects/analyse", async (request, reply) => {
   const { path: projectPath } = request.query as { path?: string };
   const root = path.resolve(projectPath || ".");
+  const identity = await loadOrCreateIdentity(root);
   const scanResult = scanner.scan(root);
-  const profile = classifier.classify(scanResult);
+  const profile = classifier.classify(scanResult, { projectId: identity.projectId });
 
   return { scanResult, profile };
 });
@@ -46,8 +69,9 @@ fastify.get("/api/v1/projects/analyse", async (request, reply) => {
 fastify.get("/api/v1/projects/explain", async (request, reply) => {
   const { path: projectPath } = request.query as { path?: string };
   const root = path.resolve(projectPath || ".");
+  const identity = await loadOrCreateIdentity(root);
   const scanResult = scanner.scan(root);
-  const profile = classifier.classify(scanResult);
+  const profile = classifier.classify(scanResult, { projectId: identity.projectId });
 
   return {
     summary: `Project '${profile.project.name}' is classified as archetype '${profile.project.archetype}'.`,
@@ -60,8 +84,9 @@ fastify.get("/api/v1/projects/explain", async (request, reply) => {
 fastify.get("/api/v1/projects/recommendations", async (request, reply) => {
   const { path: projectPath } = request.query as { path?: string };
   const root = path.resolve(projectPath || ".");
+  const identity = await loadOrCreateIdentity(root);
   const scanResult = scanner.scan(root);
-  const profile = classifier.classify(scanResult);
+  const profile = classifier.classify(scanResult, { projectId: identity.projectId });
   const recommendations = recommendationEngine.generateRecommendations(profile, scanResult.assertions);
 
   return { recommendations };
@@ -70,8 +95,9 @@ fastify.get("/api/v1/projects/recommendations", async (request, reply) => {
 fastify.post("/api/v1/projects/compile", async (request, reply) => {
   const { path: projectPath, targetAdapters } = request.body as { path?: string; targetAdapters?: string[] };
   const root = path.resolve(projectPath || ".");
+  const identity = await loadOrCreateIdentity(root);
   const scanResult = scanner.scan(root);
-  const profile = classifier.classify(scanResult);
+  const profile = classifier.classify(scanResult, { projectId: identity.projectId });
   const activePacks = expertEngine.resolveActivePacks(profile);
 
   const compileOutput = await compiler.compile({
@@ -86,8 +112,9 @@ fastify.post("/api/v1/projects/compile", async (request, reply) => {
 fastify.post("/api/v1/projects/activate", async (request, reply) => {
   const { path: projectPath, targetAdapters } = request.body as { path?: string; targetAdapters?: string[] };
   const root = path.resolve(projectPath || ".");
+  const identity = await loadOrCreateIdentity(root);
   const scanResult = scanner.scan(root);
-  const profile = classifier.classify(scanResult);
+  const profile = classifier.classify(scanResult, { projectId: identity.projectId });
   const activePacks = expertEngine.resolveActivePacks(profile);
 
   const compileOutput = await compiler.compile({
@@ -99,7 +126,7 @@ fastify.post("/api/v1/projects/activate", async (request, reply) => {
   const activationResult = await activationEngine.activate(root, compileOutput);
 
   if (activationResult.success) {
-    memoryEngine.recordEvent(root, "ACTIVATION_COMPLETED", profile.project.id, {
+    memoryEngine.recordEvent(root, "ACTIVATION_COMPLETED", identity.projectId, {
       activationId: activationResult.activationId,
       backupId: activationResult.backupId
     });

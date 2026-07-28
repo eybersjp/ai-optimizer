@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { generateEventId } from "@ai-optimize/project-identity";
 
 export interface ProjectEvent {
   id: string;
@@ -33,7 +34,7 @@ export class MemoryEngine {
   }
 
   public recordEvent(projectRoot: string, type: string, projectId: string, payload: Record<string, any>): ProjectEvent {
-    const id = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = generateEventId();
     const timestamp = new Date().toISOString();
     const event: ProjectEvent = { id, type, projectId, payload, timestamp };
 

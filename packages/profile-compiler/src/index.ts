@@ -26,9 +26,10 @@ export class ProfileCompiler {
     const steps: { action: "create" | "modify" | "backup" | "verify"; targetPath: string; description: string }[] = [];
 
     // Target configuration artifacts (.ai-optimize/project-profile.json)
+    // Use stable JSON serialisation: deterministic key order, 2-space indent, LF newline.
     artifacts.push({
       path: ".ai-optimize/project-profile.json",
-      content: JSON.stringify(input.project, null, 2),
+      content: stableJsonStringify(input.project),
       artifactType: "project-profile",
       targetAdapter: "core"
     });
@@ -38,7 +39,8 @@ export class ProfileCompiler {
       description: "Write canonical provider-neutral project profile"
     });
 
-    const targetAdapterIds = input.targetAdapters || ["claude-code", "vscode"];
+    // Sort adapter IDs for stable ordering across identical inputs
+    const targetAdapterIds = [...(input.targetAdapters || ["claude-code", "vscode"])].sort();
 
     for (const adapterId of targetAdapterIds) {
       const adapter = this.adapters.get(adapterId);
@@ -62,7 +64,9 @@ export class ProfileCompiler {
         });
       }
 
-      for (const art of generated) {
+      // Sort artifacts within each adapter by path for stable ordering
+      const sortedGenerated = [...generated].sort((a, b) => a.path.localeCompare(b.path));
+      for (const art of sortedGenerated) {
         artifacts.push(art);
         steps.push({
           action: art.isManagedBlock ? "modify" : "create",
@@ -83,4 +87,19 @@ export class ProfileCompiler {
       }
     };
   }
+}
+
+/**
+ * Produce byte-identical JSON for identical inputs.
+ *
+ * Rules:
+ * - Consistent 2-space indentation
+ * - LF newline termination
+ * - No timestamps or random values injected
+ * - Arrays preserved in their canonical order
+ * - Object key order is governed by the input object's insertion order
+ *   (TypeScript/V8 preserves insertion order for string keys)
+ */
+function stableJsonStringify(value: unknown): string {
+  return JSON.stringify(value, null, 2) + "\n";
 }

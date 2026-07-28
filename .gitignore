@@ -32,6 +32,13 @@ temp_test_repo/
 .ai-optimize/backups/
 .ai-optimize/activation.lock
 
+# AI Optimize Identity Decision
+# .ai-optimize/project.json is NOT gitignored because it represents canonical
+# project identity that must travel with the repository. It is the single source
+# of truth for stable project ID across all operations, migrations, and clones.
+# Unlike backups and lock files (which are ephemeral runtime state), project.json
+# is intended to be committed and versioned alongside project-profile.json.
+
 # OS Files
 .DS_Store
 Thumbs.db

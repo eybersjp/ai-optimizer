@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-optimize/contracts": "workspace:*",
+    "@ai-optimize/project-identity": "workspace:*",
     "@ai-optimize/project-scanner": "workspace:*"
   },
   "devDependencies": {

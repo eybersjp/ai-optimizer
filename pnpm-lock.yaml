@@ -35,6 +35,9 @@ importers:
       '@ai-optimize/project-classifier':
         specifier: workspace:*
         version: link:../../packages/project-classifier
+      '@ai-optimize/project-identity':
+        specifier: workspace:*
+        version: link:../../packages/project-identity
       '@ai-optimize/project-scanner':
         specifier: workspace:*
         version: link:../../packages/project-scanner
@@ -69,6 +72,9 @@ importers:
       '@ai-optimize/project-classifier':
         specifier: workspace:*
         version: link:../../packages/project-classifier
+      '@ai-optimize/project-identity':
+        specifier: workspace:*
+        version: link:../../packages/project-identity
       '@ai-optimize/project-scanner':
         specifier: workspace:*
         version: link:../../packages/project-scanner
@@ -113,6 +119,9 @@ importers:
       '@ai-optimize/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ai-optimize/project-identity':
+        specifier: workspace:*
+        version: link:../project-identity
     devDependencies:
       typescript:
         specifier: ^5.7.2
@@ -189,6 +198,9 @@ importers:
       '@ai-optimize/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ai-optimize/project-identity':
+        specifier: workspace:*
+        version: link:../project-identity
     devDependencies:
       typescript:
         specifier: ^5.7.2
@@ -215,9 +227,18 @@ importers:
       '@ai-optimize/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ai-optimize/project-identity':
+        specifier: workspace:*
+        version: link:../project-identity
       '@ai-optimize/project-scanner':
         specifier: workspace:*
         version: link:../project-scanner
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/project-identity:
     devDependencies:
       typescript:
         specifier: ^5.7.2

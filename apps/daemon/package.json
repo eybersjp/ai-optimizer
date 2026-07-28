@@ -18,6 +18,7 @@
     "@ai-optimize/profile-compiler": "workspace:*",
     "@ai-optimize/activation-engine": "workspace:*",
     "@ai-optimize/memory-engine": "workspace:*",
+    "@ai-optimize/project-identity": "workspace:*",
     "fastify": "^5.2.1"
   },
   "devDependencies": {

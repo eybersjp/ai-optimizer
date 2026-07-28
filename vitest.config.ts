@@ -19,7 +19,8 @@ export default defineConfig({
       "@ai-optimize/profile-compiler": path.resolve("./packages/profile-compiler/src/index.ts"),
       "@ai-optimize/activation-engine": path.resolve("./packages/activation-engine/src/index.ts"),
       "@ai-optimize/memory-engine": path.resolve("./packages/memory-engine/src/index.ts"),
-      "@ai-optimize/mcp-server": path.resolve("./packages/mcp-server/src/index.ts")
+      "@ai-optimize/mcp-server": path.resolve("./packages/mcp-server/src/index.ts"),
+      "@ai-optimize/project-identity": path.resolve("./packages/project-identity/src/index.ts")
     }
   }
 });

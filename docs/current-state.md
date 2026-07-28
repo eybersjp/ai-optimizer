@@ -55,7 +55,16 @@ The following components are fully operational, tested, and integrated into the 
 
 ## 5. Current Safety Limitations
 
-- **Non-deterministic ID Generation**: `Math.random()` and timestamps produce non-deterministic outputs across compilation runs.
+- **Managed Project Identity**: A dedicated `@ai-optimize/project-identity` package handles creation, loading, validation, migration, and reconciliation of canonical project identity. The identity is persisted in `.ai-optimize/project.json` (versioned schema, `prj_` prefix, crypto-generated IDs).
+- **Deterministic Assertion IDs**: `EvidenceEngine` now derives assertion IDs via SHA-256 from stable canonical fields (projectId, scannerRuleId, subject, predicate, etc.), replacing the old timestamp+random approach. `Math.random()` is eliminated from all identity-related production code.
+- **Deterministic Compilation**: `ProfileCompiler` produces byte-identical outputs for identical canonical inputs. Adapter ordering, artifact ordering, and JSON serialisation are all deterministic. No compile-time timestamps or random values appear in generated artifacts.
+- **Crypto-based Identifiers**: All identifier generators (`generateProjectId`, `generateActivationId`, `generateBackupId`, `generateEventId`, `generateCorrelationId`) use `node:crypto.randomBytes()` instead of `Math.random()`.
+- **Legacy Migration**: Repositories without `.ai-optimize/project.json` are auto-migrated. Candidates are discovered from project-profile.json, managed-artifacts.json, events.jsonl, and backup snapshots. Conflicts are surfaced as `IDENTITY_CONFLICT` with structured error details.
+- **Controlled Reconciliation**: `ai-optimize identity status` and `ai-optimize identity reconcile --use <id>` commands allow safe resolution of conflicting project IDs. Superseded IDs are preserved in the `aliases` array.
+- **Typed Identity Errors**: Structured error codes (`PROJECT_NOT_REGISTERED`, `IDENTITY_CONFLICT`, `IDENTITY_FILE_INVALID`, `IDENTITY_RECONCILIATION_REQUIRED`, `IDENTITY_RECONCILIATION_FAILED`, `REGISTERED_ROOT_MISMATCH`) replace generic string errors.
+
+### Known Limitations
 - **Locking Concurrency**: File-based locking (`activation.lock`) uses non-atomic file presence checks.
 - **Daemon Security**: The Fastify daemon API listens on local port `4737` without request authentication or authorization tokens.
 - **JSON Formatting in `.vscode/settings.json`**: Insertion of comment markers into VS Code configuration can cause errors in non-comment-aware JSON parsers.
+- **Scanner Pass 4 & 5**: Pass 4 only checks for `.git` folder existence; Pass 5 (Semantic Inspection) is a stub.

@@ -8,6 +8,7 @@ import {
   BackupSnapshot,
   ManagedArtifactRecord
 } from "@ai-optimize/contracts";
+import { generateActivationId, generateBackupId } from "@ai-optimize/project-identity";
 
 export class ActivationEngine {
   private calculateHash(content: string): string {
@@ -31,10 +32,10 @@ export class ActivationEngine {
       throw new Error(`Activation lock present at ${lockFile}. Another activation process may be running.`);
     }
 
-    const activationId = `act_${Math.random().toString(36).substring(2, 10)}`;
+    const activationId = generateActivationId();
     fs.writeFileSync(lockFile, JSON.stringify({ activationId, timestamp: new Date().toISOString() }));
 
-    const backupId = `bk_${Date.now()}`;
+    const backupId = generateBackupId();
     const backupFiles: { path: string; content: string | null; hash: string | null }[] = [];
     const appliedArtifacts: string[] = [];
 

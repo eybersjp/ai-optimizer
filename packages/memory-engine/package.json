@@ -9,7 +9,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@ai-optimize/contracts": "workspace:*"
+    "@ai-optimize/contracts": "workspace:*",
+    "@ai-optimize/project-identity": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

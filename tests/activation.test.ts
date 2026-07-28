@@ -33,7 +33,8 @@ describe("ActivationEngine Transactional Lock & Rollback", () => {
     expertEngine.loadBuiltinPacks(path.resolve("expert-packs"));
 
     const scanResult = scanner.scan(tempTestDir);
-    const profile = classifier.classify(scanResult);
+    // Use a stable test projectId for isolated temp directory
+    const profile = classifier.classify(scanResult, { projectId: "prj_TESTTEMPACT001" });
     const activePacks = expertEngine.resolveActivePacks(profile);
 
     const compileOutput = await compiler.compile({
@@ -44,6 +45,7 @@ describe("ActivationEngine Transactional Lock & Rollback", () => {
 
     const result = await activationEngine.activate(tempTestDir, compileOutput);
     expect(result.success).toBe(true);
+    expect(result.projectId).toBe("prj_TESTTEMPACT001");
     expect(fs.existsSync(path.join(tempTestDir, "CLAUDE.md"))).toBe(true);
 
     const rollbackResult = await activationEngine.rollback(tempTestDir, result.backupId);

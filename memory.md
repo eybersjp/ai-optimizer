@@ -50,14 +50,20 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 
 ---
 
-## Known Defects
-1. **Missing workspace package manifest**: `packages/mcp-server` was missing `package.json`, excluding it from pnpm workspace builds. *(Fixed in baseline)*.
-2. **Root lint script failure**: Root `package.json` `lint` script executed `tsc --noEmit` from root, failing on workspace cross-package imports and JSX syntax. *(Fixed to `pnpm -r exec tsc --noEmit` in baseline)*.
-3. **Implicit `any` in test suite**: `tests/compiler.test.ts` contained untyped predicate parameters in `Array.prototype.find`. *(Fixed in baseline)*.
-4. **Non-deterministic ID generation**: `ProjectClassifier`, `EvidenceEngine`, and `ActivationEngine` generate IDs using `Math.random()` and `Date.now()`, violating strict compilation determinism.
-5. **Invalid JSON syntax in VSCode adapter**: `VSCodeAdapter` generates managed blocks with `//` single-line comments in `.vscode/settings.json`, causing strict JSON parsers to fail.
-6. **Incomplete Scanner Passes**: Scanner Pass 4 (Git Inspection) only checks `.git` directory existence; Pass 5 (Semantic Inspection) is not implemented.
-7. **Lack of stdio MCP Transport**: `@ai-optimize/mcp-server` implements tool logic but lacks a stdio server entry point for external AI host connections.
+## Known Defects and Resolved Issues
+
+### Resolved (Milestone 2)
+1. **Non-deterministic ID generation** — fixed by creating `@ai-optimize/project-identity` package. All IDs (`prj_`, `act_`, `bk_`, `evt_`, `cor_`, `ast_`) now use `node:crypto.randomBytes()` and SHA-256. `Math.random()` is eliminated from all identity-related production source files.
+2. **Assertion IDs not deterministic** — `EvidenceEngine` derives assertion IDs from stable canonical fields (projectId, scannerRuleId, subject, predicate, canonicalSourcePath) via SHA-256. Identical inputs produce identical `ast_` IDs.
+3. **Compilation not deterministic** — `ProfileCompiler` ensures stable adapter ordering, artifact sorting, and LF-terminated 2-space-indent JSON serialisation. Identical compile inputs produce byte-identical compile outputs.
+4. **Classifier generated its own project IDs** — `ProjectClassifier.classify()` now takes a required `ClassifyOptions` parameter with `projectId` from the canonical identity service. It never generates project IDs.
+5. **CLI ran fresh scan+classify on every command** — All 9 CLI commands and all 7 daemon endpoints now load canonical identity and pass the same `projectId` through classification and compilation.
+6. **Inconsistent project IDs in checked-in state** — The current repository had `prj_HJCZZU3X` (managed-artifacts) and `prj_5IKAG2Z3` (project-profile). Reconciled to `prj_HJCZZU3X` as canonical with `prj_5IKAG2Z3` as a superseded alias in `.ai-optimize/project.json`.
+
+### Remaining Defects
+7. **Invalid JSON syntax in VSCode adapter**: `VSCodeAdapter` generates managed blocks with `//` single-line comments in `.vscode/settings.json`, causing strict JSON parsers to fail.
+8. **Incomplete Scanner Passes**: Scanner Pass 4 (Git Inspection) only checks `.git` directory existence; Pass 5 (Semantic Inspection) is not implemented.
+9. **Lack of stdio MCP Transport**: `@ai-optimize/mcp-server` implements tool logic but lacks a stdio server entry point for external AI host connections.
 
 ---
 
@@ -66,11 +72,14 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 - Updated root `package.json` `lint` command to `pnpm -r exec tsc --noEmit`.
 - Annotated callback signatures in `tests/compiler.test.ts` and explicit ESM file extension in `apps/dashboard/src/main.tsx`.
 - Created and checked out baseline development branch `dev/trustworthy-core-v0.1.1`.
+- Created `packages/project-identity` as a separate domain service package for canonical project identity management. Chose a dedicated package over inline identity logic to maintain a clean dependency boundary.
+- `project.json` (`.ai-optimize/project.json`) is NOT gitignored because it represents canonical project identity that must travel with the repository. It is committed and versioned alongside `project-profile.json`. Unlike backups and lock files (ephemeral runtime state), `project.json` is the single source of truth for stable project ID across all operations, migrations, and clones.
+- Selected `prj_HJCZZU3X` as the canonical project ID for this repository because it is the consistent identity across all five managed-artifact records (`managed-artifacts.json`), while `prj_5IKAG2Z3` only appeared in a single generated profile.
+- Identity tests operate on isolated temporary directories (`fs.mkdtempSync`) to avoid depending on the developer's actual checkout path or committed local runtime state.
 
 ---
 
 ## Unresolved Issues
-- Non-deterministic ID generation in classifier, evidence engine, and activation engine.
 - Scanner Pass 4 and Pass 5 completeness.
 - Invalid JSON comment syntax in VSCode managed settings block.
 - Lack of standalone CLI stdio transport entry point for `mcp-server`.
@@ -80,3 +89,4 @@ Instead of operating as an autonomous coding agent, AI Optimize acts as an evide
 
 ## Completed Milestones
 - **Baseline Milestone**: Established trustworthy core development baseline (`dev/trustworthy-core-v0.1.1`). 100% passing build (`pnpm build`), test suite (`pnpm test`), and typecheck (`pnpm lint`).
+- **Milestone 2 (Stable and Deterministic Project Identity)**: Created `@ai-optimize/project-identity` package with crypto-based ID generation, stable assertion IDs, deterministic compilation, legacy migration, controlled reconciliation, typed identity errors, and 17+ comprehensive identity tests. Branch: `dev/trustworthy-core-v0.1.1`.

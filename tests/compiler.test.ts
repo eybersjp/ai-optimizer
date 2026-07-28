@@ -19,7 +19,7 @@ describe("ProfileCompiler Vertical Slice Integration", () => {
     expertEngine.loadBuiltinPacks(path.resolve("expert-packs"));
 
     const scanResult = scanner.scan(root);
-    const profile = classifier.classify(scanResult);
+    const profile = classifier.classify(scanResult, { projectId: "prj_TESTFIXEDID0001" });
     const activePacks = expertEngine.resolveActivePacks(profile);
 
     const compileOutput = await compiler.compile({
@@ -29,6 +29,8 @@ describe("ProfileCompiler Vertical Slice Integration", () => {
     });
 
     expect(compileOutput.canonicalProfile.project.name).toBe("ai-optimizer");
+    // Verify the project ID from identity is propagated through compilation
+    expect(compileOutput.canonicalProfile.project.id).toBe("prj_TESTFIXEDID0001");
     expect(compileOutput.artifacts.length).toBeGreaterThan(0);
 
     const claudeArtifact = compileOutput.artifacts.find((a: GeneratedArtifact) => a.path === "CLAUDE.md");

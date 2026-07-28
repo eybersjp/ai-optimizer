@@ -2,8 +2,18 @@ import * as path from "node:path";
 import { ProjectProfile } from "@ai-optimize/contracts";
 import { ScanResult } from "@ai-optimize/project-scanner";
 
+/**
+ * Options passed to classify().
+ * The projectId MUST come from the canonical identity service.
+ * ProjectClassifier never generates project IDs.
+ */
+export interface ClassifyOptions {
+  /** Stable canonical project ID from @ai-optimize/project-identity. */
+  projectId: string;
+}
+
 export class ProjectClassifier {
-  public classify(scanResult: ScanResult): ProjectProfile {
+  public classify(scanResult: ScanResult, options: ClassifyOptions): ProjectProfile {
     const projectName = path.basename(scanResult.root);
     const hasNext = scanResult.frameworks.includes("nextjs");
     const hasSupabase = scanResult.frameworks.includes("supabase");
@@ -39,7 +49,7 @@ export class ProjectClassifier {
     return {
       schemaVersion: "1.0.0",
       project: {
-        id: `prj_${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+        id: options.projectId,
         name: projectName,
         root: scanResult.root,
         archetype,
