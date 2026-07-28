@@ -6,6 +6,8 @@ import { ProjectClassifier } from "@ai-optimize/project-classifier";
 import { ExpertEngine } from "@ai-optimize/expert-engine";
 import { ProfileCompiler } from "@ai-optimize/profile-compiler";
 
+import { GeneratedArtifact } from "@ai-optimize/contracts";
+
 describe("ProfileCompiler Vertical Slice Integration", () => {
   it("should compile canonical project profile and adapter artifacts", async () => {
     const root = path.resolve(".");
@@ -29,12 +31,12 @@ describe("ProfileCompiler Vertical Slice Integration", () => {
     expect(compileOutput.canonicalProfile.project.name).toBe("ai-optimizer");
     expect(compileOutput.artifacts.length).toBeGreaterThan(0);
 
-    const claudeArtifact = compileOutput.artifacts.find((a) => a.path === "CLAUDE.md");
+    const claudeArtifact = compileOutput.artifacts.find((a: GeneratedArtifact) => a.path === "CLAUDE.md");
     expect(claudeArtifact).toBeDefined();
     expect(claudeArtifact?.content).toContain("# ai-optimizer");
     expect(claudeArtifact?.content.split("\n").length).toBeLessThan(200);
 
-    const vscodeArtifact = compileOutput.artifacts.find((a) => a.path === ".vscode/settings.json");
+    const vscodeArtifact = compileOutput.artifacts.find((a: GeneratedArtifact) => a.path === ".vscode/settings.json");
     expect(vscodeArtifact).toBeDefined();
     expect(vscodeArtifact?.content).toContain("// AI-OPTIMIZE:BEGIN");
   });

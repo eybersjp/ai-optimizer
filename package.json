@@ -8,7 +8,7 @@
     "build": "pnpm -r run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "pnpm -r exec tsc --noEmit",
     "daemon": "pnpm --filter @ai-optimize/daemon dev",
     "cli": "pnpm --filter @ai-optimize/cli dev",
     "dashboard": "pnpm --filter @ai-optimize/dashboard dev"
