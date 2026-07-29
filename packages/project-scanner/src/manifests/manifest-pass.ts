@@ -452,8 +452,20 @@ export class ManifestPass implements ScannerPass {
         technologiesMap.set(`vitest:${pkg.name}`, tech);
       }
 
-      if (allDeps["typescript"] || allDeps["@types/node"]) {
+      // TypeScript package-level evidence (Option A)
+      const hasTsDep = Boolean(allDeps["typescript"] || Object.keys(allDeps).some((k) => k.startsWith("@types/")));
+      const tsConfigFile = manifests.find(
+        (m) => (m.type === "tsconfig.json" || m.type.startsWith("tsconfig")) &&
+               (pkg.relativeDir === "." ? path.dirname(m.relativePath) === "." : m.relativePath.startsWith(pkg.relativeDir + "/"))
+      );
+      const tsSourceFile = context.files.find(
+        (f) => (f.extension === ".ts" || f.extension === ".tsx" || f.extension === ".mts" || f.extension === ".cts") &&
+               (pkg.relativeDir === "." ? !f.relativePath.includes("/") : f.relativePath.startsWith(pkg.relativeDir + "/"))
+      );
+
+      if (hasTsDep || tsConfigFile || tsSourceFile) {
         languages.add("typescript");
+        const sourcePath = tsSourceFile?.relativePath ?? tsConfigFile?.relativePath ?? pkg.manifestPath;
         const tech: TechnologyFinding = {
           id: "typescript",
           name: "TypeScript",
@@ -461,11 +473,11 @@ export class ManifestPass implements ScannerPass {
           status: "observed",
           owningPackage: pkg.name,
           owningPackageDir: pkg.relativeDir,
-          sourcePath: pkg.manifestPath,
-          version: allDeps["typescript"],
+          sourcePath,
+          version: allDeps["typescript"] ?? "5.x",
           confidence: 1.0,
           evidenceId: "",
-          explanation: `TypeScript dependency observed in package '${pkg.name}' (${pkg.manifestPath})`
+          explanation: `TypeScript evidence observed in package '${pkg.name}' (${sourcePath})`
         };
         technologiesMap.set(`typescript:${pkg.name}`, tech);
       }

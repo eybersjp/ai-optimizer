@@ -114,6 +114,12 @@ pnpm build
 
 # Run test suite
 pnpm test
+
+# Generate machine-readable test inventory report
+pnpm test:list
+
+# Execute complete repository verification (build, test, lint, whitespace check, test inventory)
+pnpm verify
 ```
 
 ---

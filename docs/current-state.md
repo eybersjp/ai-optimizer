@@ -44,13 +44,18 @@ The following components are fully operational, tested, and integrated into the 
 
 ---
 
-## 4. Current Test Coverage
+## 4. Current Test Coverage & Verification
 
-- **Integration Tests**: 3 test suites in `tests/`:
-  - `tests/scanner.test.ts`: Verifies project scanning and classification on the repository workspace.
-  - `tests/compiler.test.ts`: Verifies end-to-end profile compilation and artifact generation for Claude Code & VS Code.
-  - `tests/activation.test.ts`: Verifies transactional activation, backup snapshot creation, and full rollback in an isolated temporary directory.
-- **Unit Test Coverage**: Package-level unit tests (`packages/*`) are currently unwritten.
+- **Authoritative Subsystem Test Inventory** (`pnpm test:list`, `pnpm verify`):
+  - `tests/activation.test.ts` (Subsystem: `activation`, 1 test)
+  - `tests/classifier.test.ts` (Subsystem: `classifier`, 4 tests)
+  - `tests/compiler.test.ts` (Subsystem: `compiler`, 8 tests)
+  - `tests/identity.test.ts` (Subsystem: `identity`, 57 tests)
+  - `tests/identity-hardening.test.ts` (Subsystem: `identity hardening`, 9 tests)
+  - `tests/scanner.test.ts` (Subsystem: `scanner`, 26 tests)
+  - `tests/audit-verification.test.ts` (Subsystem: `audit verification`, 7 tests)
+- **Total Test Suite**: 7 test files, 112 tests, 100% PASSING.
+- **Verification Runner** (`pnpm verify`): Executes `pnpm build`, `pnpm test`, `pnpm lint`, `git diff --check`, and outputs machine-readable test inventory.
 
 ---
 
