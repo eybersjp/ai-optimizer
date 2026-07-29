@@ -112,15 +112,24 @@ pnpm install
 # Build all monorepo packages
 pnpm build
 
-# Run test suite
+# Run test suite via Vitest
 pnpm test
 
-# Generate machine-readable test inventory report
+# Generate authoritative Vitest test collection report
 pnpm test:list
 
-# Execute complete repository verification (build, test, lint, whitespace check, test inventory)
+# Execute full repository verification (build, source hygiene guard, Vitest collection, gates, lint, git diff check)
 pnpm verify
 ```
+
+### 🧪 Test Reporting & Source Evidence Policies
+
+1. **Vitest as Authoritative Test Source**: Test execution counts and inventories are derived dynamically from Vitest's collected test suite (`npx vitest run --reporter=json`). Static regex source parsing is disabled for execution reporting.
+2. **Strict Verification Gates (`pnpm verify`)**: Compares Vitest collected test counts, subsystem coverage (`activation`, `audit verification`, `classifier`, `compiler`, `identity`, `identity hardening`, `scanner`), test outcomes, typechecks, source artifact hygiene, and git diff checks. Fails on any mismatch.
+3. **Source Directory Hygiene & Build Artifact Policy**: Production `src/` directories (`apps/**/src`, `packages/**/src`) must contain only authored source code. Generated build artifacts (`*.js`, `*.js.map`, `*.d.ts.map`, or generated `*.d.ts` alongside `.ts`) emit strictly to `dist/` and are guarded against appearance in `src/`.
+4. **Authored Declaration Exception**: Authored declaration files (`.d.ts`) are permitted only where declarations represent actual authored source logic with no corresponding `.ts` file.
+5. **TypeScript Evidence Priority**: Scanner language evidence prioritizes: 1. Authored `.ts`/`.tsx`/`.mts`/`.cts` source; 2. `tsconfig.json` files; 3. Package metadata (`package.json`); 4. Authored declaration files. Generated `.d.ts` files inside `dist/` or beside source files are never selected as representative language evidence.
+6. **Git Fixture Stderr Isolation**: Test fixtures initializing temporary Git repositories isolate child process stderr stream (`stdio: ["pipe", "pipe", "pipe"]`) and initialize HEAD commits cleanly, eliminating spurious `fatal:` stderr logs during clean test runs.
 
 ---
 

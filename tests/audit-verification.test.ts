@@ -1,20 +1,22 @@
 /**
- * Audit Verification Tests — Subsystem: audit verification (Milestone 3B)
+ * Audit Verification Tests — Subsystem: audit verification (Milestone 3C)
  *
  * Validates test inventory integrity, subsystem suite discovery, TypeScript evidence
- * ownership, path safety, and scanner determinism.
+ * priority, source artifact hygiene, path safety, and scanner determinism.
  */
 import { describe, it, expect } from "vitest";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { ProjectScanner } from "@ai-optimize/project-scanner";
-import { buildTestInventory } from "../scripts/test-inventory.js";
+import { getAuthoritativeTestInventory } from "../scripts/test-inventory.js";
+import { checkSourceArtifacts } from "../scripts/guard-source-artifacts.js";
 
 describe("Audit Verification Subsystem — Test Integrity & Scanner Evidence", () => {
-  it("1. All required subsystem suites are discoverable in test inventory", () => {
-    const inventory = buildTestInventory();
+  it("1. All required subsystem suites are discoverable and collected in test inventory", () => {
+    const inventory = getAuthoritativeTestInventory();
     const requiredSubsystems = [
       "activation",
+      "audit verification",
       "classifier",
       "compiler",
       "identity",
@@ -24,29 +26,33 @@ describe("Audit Verification Subsystem — Test Integrity & Scanner Evidence", (
 
     for (const required of requiredSubsystems) {
       expect(inventory.subsystems).toContain(required);
+      const subTests = inventory.tests.filter((t) => t.subsystem === required);
+      expect(subTests.length).toBeGreaterThan(0);
     }
   });
 
-  it("2. Compiler integration tests are present and discoverable", () => {
-    const inventory = buildTestInventory();
+  it("2. Compiler integration tests are present and collected", () => {
+    const inventory = getAuthoritativeTestInventory();
     const compilerTests = inventory.tests.filter((t) => t.subsystem === "compiler");
     expect(compilerTests.length).toBeGreaterThanOrEqual(5);
     expect(compilerTests.some((t) => t.file === "tests/compiler.test.ts")).toBe(true);
   });
 
-  it("3. Test inventory count accurately reflects discoverable tests", () => {
-    const inventory = buildTestInventory();
-    expect(inventory.totalActiveTests).toBe(inventory.tests.filter((t) => t.status === "active").length);
-    expect(inventory.totalFiles).toBe(inventory.subsystems.length);
+  it("3. Test inventory collected total matches sum of test statuses", () => {
+    const inventory = getAuthoritativeTestInventory();
+    expect(inventory.totalCollectedTests).toBe(inventory.tests.length);
+    expect(inventory.totalCollectedTests).toBe(
+      inventory.totalPassed + inventory.totalFailed + inventory.totalSkipped + inventory.totalTodo
+    );
   });
 
   it("4. Skipped tests are reported separately from active tests", () => {
-    const inventory = buildTestInventory();
-    expect(typeof inventory.totalSkippedTests).toBe("number");
-    expect(inventory.totalSkippedTests).toBe(inventory.tests.filter((t) => t.status === "skipped").length);
+    const inventory = getAuthoritativeTestInventory();
+    expect(typeof inventory.totalSkipped).toBe("number");
+    expect(inventory.totalSkipped).toBe(inventory.tests.filter((t) => t.status === "skipped").length);
   });
 
-  it("5. TypeScript evidence ownership is accurate (Option A: package-owned)", () => {
+  it("5. TypeScript evidence ownership is accurate and cites authored source files", () => {
     const root = path.resolve(".");
     const scanner = new ProjectScanner();
     const result = scanner.scan(root);
@@ -58,20 +64,30 @@ describe("Audit Verification Subsystem — Test Integrity & Scanner Evidence", (
       expect(tech.owningPackage).toBeTruthy();
       expect(tech.owningPackageDir).toBeTruthy();
       expect(tech.sourcePath).toBeTruthy();
+      expect(tech.sourcePath).not.endsWith(".d.ts");
       expect(tech.evidenceId).toMatch(/^ast_/);
 
-      // Verify that claimed sourcePath exists on disk
       const fullPath = path.resolve(tech.sourcePath);
       expect(fs.existsSync(fullPath)).toBe(true);
     }
+
+    // Specific check for packages/contracts
+    const contractsTech = tsTechs.find((t) => t.owningPackage === "@ai-optimize/contracts");
+    expect(contractsTech).toBeDefined();
+    expect(contractsTech?.sourcePath).toMatch(/^packages\/contracts\/src\/.*\.ts$/);
+    expect(contractsTech?.sourcePath).not.toContain(".d.ts");
   });
 
-  it("6. No absolute checkout path appears in scanner summary output", () => {
+  it("6. Source directory build artifact guard passes cleanly", () => {
+    const violations = checkSourceArtifacts();
+    expect(violations).toEqual([]);
+  });
+
+  it("7. No absolute checkout path appears in scanner summary output", () => {
     const root = path.resolve(".");
     const scanner = new ProjectScanner();
     const result = scanner.scan(root);
 
-    // rootRelative must be "."
     expect(result.rich.rootRelative).toBe(".");
 
     for (const pkg of result.rich.workspacePackages) {
@@ -85,7 +101,7 @@ describe("Audit Verification Subsystem — Test Integrity & Scanner Evidence", (
     }
   });
 
-  it("7. Repeated scanner summary output is deterministic (excluding timing)", () => {
+  it("8. Repeated scanner summary output is deterministic (excluding timing)", () => {
     const root = path.resolve(".");
     const scanner = new ProjectScanner();
 

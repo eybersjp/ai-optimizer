@@ -452,20 +452,60 @@ export class ManifestPass implements ScannerPass {
         technologiesMap.set(`vitest:${pkg.name}`, tech);
       }
 
-      // TypeScript package-level evidence (Option A)
+      // TypeScript package-level evidence (Option A with strict priority)
       const hasTsDep = Boolean(allDeps["typescript"] || Object.keys(allDeps).some((k) => k.startsWith("@types/")));
-      const tsConfigFile = manifests.find(
-        (m) => (m.type === "tsconfig.json" || m.type.startsWith("tsconfig")) &&
-               (pkg.relativeDir === "." ? path.dirname(m.relativePath) === "." : m.relativePath.startsWith(pkg.relativeDir + "/"))
-      );
-      const tsSourceFile = context.files.find(
-        (f) => (f.extension === ".ts" || f.extension === ".tsx" || f.extension === ".mts" || f.extension === ".cts") &&
-               (pkg.relativeDir === "." ? !f.relativePath.includes("/") : f.relativePath.startsWith(pkg.relativeDir + "/"))
+      const isIgnoredPath = (relPath: string) => {
+        const norm = relPath.replace(/\\/g, "/");
+        return (
+          norm.includes("/dist/") ||
+          norm.includes("/build/") ||
+          norm.includes("/out/") ||
+          norm.includes("/coverage/") ||
+          norm.includes("/.cache/") ||
+          norm.includes("/node_modules/") ||
+          norm.endsWith(".js.map") ||
+          norm.endsWith(".d.ts.map")
+        );
+      };
+
+      const packageFiles = context.files.filter(
+        (f) =>
+          !isIgnoredPath(f.relativePath) &&
+          (pkg.relativeDir === "."
+            ? !f.relativePath.includes("/")
+            : f.relativePath.startsWith(pkg.relativeDir + "/"))
       );
 
-      if (hasTsDep || tsConfigFile || tsSourceFile) {
+      // Priority 1: Authored .ts / .tsx / .mts / .cts (excluding .d.ts)
+      const authoredTsSource = packageFiles.find(
+        (f) =>
+          (f.relativePath.endsWith(".ts") ||
+            f.relativePath.endsWith(".tsx") ||
+            f.relativePath.endsWith(".mts") ||
+            f.relativePath.endsWith(".cts")) &&
+          !f.relativePath.endsWith(".d.ts")
+      );
+
+      // Priority 2: tsconfig files
+      const tsConfigFile = manifests.find(
+        (m) =>
+          (m.type === "tsconfig.json" || m.type.startsWith("tsconfig")) &&
+          (pkg.relativeDir === "."
+            ? path.dirname(m.relativePath) === "."
+            : m.relativePath.startsWith(pkg.relativeDir + "/"))
+      );
+
+      // Priority 3: Authored .d.ts (only where declarations are the package source and no .ts exists)
+      const authoredDtsFile = packageFiles.find((f) => f.relativePath.endsWith(".d.ts"));
+
+      const sourcePath =
+        authoredTsSource?.relativePath ??
+        tsConfigFile?.relativePath ??
+        pkg.manifestPath ??
+        authoredDtsFile?.relativePath;
+
+      if (hasTsDep || tsConfigFile || authoredTsSource || authoredDtsFile) {
         languages.add("typescript");
-        const sourcePath = tsSourceFile?.relativePath ?? tsConfigFile?.relativePath ?? pkg.manifestPath;
         const tech: TechnologyFinding = {
           id: "typescript",
           name: "TypeScript",

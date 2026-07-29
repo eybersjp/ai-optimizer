@@ -42,20 +42,18 @@ The following components are fully operational, tested, and integrated into the 
 - **Multi-tenant Security Pack Validators**: Advanced tenant isolation AST code analysis.
 - **Live MCP Host Governance**: Active host-side tool execution in external agent runtime sessions.
 
----
-
 ## 4. Current Test Coverage & Verification
 
-- **Authoritative Subsystem Test Inventory** (`pnpm test:list`, `pnpm verify`):
+- **Authoritative Vitest Execution Inventory** (`pnpm test:list`, `pnpm verify`):
   - `tests/activation.test.ts` (Subsystem: `activation`, 1 test)
+  - `tests/audit-verification.test.ts` (Subsystem: `audit verification`, 8 tests)
   - `tests/classifier.test.ts` (Subsystem: `classifier`, 4 tests)
   - `tests/compiler.test.ts` (Subsystem: `compiler`, 8 tests)
   - `tests/identity.test.ts` (Subsystem: `identity`, 57 tests)
   - `tests/identity-hardening.test.ts` (Subsystem: `identity hardening`, 9 tests)
   - `tests/scanner.test.ts` (Subsystem: `scanner`, 26 tests)
-  - `tests/audit-verification.test.ts` (Subsystem: `audit verification`, 7 tests)
-- **Total Test Suite**: 7 test files, 112 tests, 100% PASSING.
-- **Verification Runner** (`pnpm verify`): Executes `pnpm build`, `pnpm test`, `pnpm lint`, `git diff --check`, and outputs machine-readable test inventory.
+- **Total Test Suite**: 7 test files, 113 tests collected and executed by Vitest, 0 failures, 0 skipped, 100% PASSING.
+- **Verification Runner** (`pnpm verify`): Executes `pnpm build`, source directory hygiene guard (`scripts/guard-source-artifacts.ts`), Vitest test collection (`npx vitest run --reporter=json`), strict subsystem and count mismatch gates, `pnpm lint`, and `git diff --check`.
 
 ---
 

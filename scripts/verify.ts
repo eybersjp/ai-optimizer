@@ -1,40 +1,146 @@
-import { execSync } from "node:child_process";
-import { buildTestInventory } from "./test-inventory.js";
+import { execFileSync } from "node:child_process";
+import * as path from "node:path";
+import { getAuthoritativeTestInventory } from "./test-inventory.js";
+import { checkSourceArtifacts } from "./guard-source-artifacts.js";
 
-function runStep(name: string, command: string): void {
-  console.log(`\n=== STEP: ${name} (${command}) ===`);
-  try {
-    const output = execSync(command, { encoding: "utf-8", stdio: "pipe" });
-    if (output.trim()) console.log(output.trim());
-    console.log(`✓ ${name} PASSED`);
-  } catch (err: any) {
-    console.error(`❌ ${name} FAILED:`);
-    if (err.stdout) console.error(err.stdout);
-    if (err.stderr) console.error(err.stderr);
-    process.exit(1);
-  }
-}
+const REQUIRED_SUBSYSTEMS = [
+  "activation",
+  "audit verification",
+  "classifier",
+  "compiler",
+  "identity",
+  "identity hardening",
+  "scanner"
+];
 
-function main(): void {
+function runVerification() {
+  const root = path.resolve(".");
   console.log("=========================================");
   console.log(" AI OPTIMIZE REPOSITORY VERIFICATION");
+  console.log("=========================================\n");
+
+  // Step 1: Workspace Build
+  console.log("=== STEP 1: Workspace Build (pnpm build) ===");
+  try {
+    const buildOutput = execFileSync("pnpm", ["build"], {
+      cwd: root,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
+      windowsHide: true
+    });
+    console.log(buildOutput);
+    console.log("✓ Step 1: Workspace Build PASSED\n");
+  } catch (err: any) {
+    console.error("❌ Step 1: Workspace Build FAILED");
+    console.error(err.stdout || err.stderr || err.message);
+    process.exit(1);
+  }
+
+  // Step 2: Source Artifact Hygiene Guard
+  console.log("=== STEP 2: Source Artifact Hygiene Guard ===");
+  const sourceViolations = checkSourceArtifacts(root);
+  if (sourceViolations.length > 0) {
+    console.error("❌ Step 2: Source Artifact Guard FAILED:");
+    for (const v of sourceViolations) {
+      console.error(`   - ${v.file}: ${v.reason}`);
+    }
+    process.exit(1);
+  }
+  console.log("✓ Step 2: Source Artifact Hygiene Guard PASSED\n");
+
+  // Step 3: Authoritative Subsystem Test Suite Execution
+  console.log("=== STEP 3: Subsystem Test Execution & Inventory Collection ===");
+  let inventory;
+  try {
+    inventory = getAuthoritativeTestInventory(root);
+  } catch (err: any) {
+    console.error("❌ Step 3: Subsystem Test Execution FAILED");
+    console.error(err.message);
+    process.exit(1);
+  }
+
+  console.log(`Total Test Files:      ${inventory.totalFiles}`);
+  console.log(`Total Collected Tests: ${inventory.totalCollectedTests}`);
+  console.log(`Passed Tests:          ${inventory.totalPassed}`);
+  console.log(`Failed Tests:          ${inventory.totalFailed}`);
+  console.log(`Skipped Tests:         ${inventory.totalSkipped}`);
+  console.log(`Todo Tests:            ${inventory.totalTodo}`);
+  console.log(`Subsystems (${inventory.subsystems.length}):   ${inventory.subsystems.join(", ")}\n`);
+
+  // Step 4: Strict Count & Subsystem Mismatch Verification
+  console.log("=== STEP 4: Authoritative Inventory Comparison & Verification Gates ===");
+  let failedGate = false;
+
+  if (inventory.totalFailed > 0) {
+    console.error(`❌ Gate Failure: ${inventory.totalFailed} tests failed!`);
+    failedGate = true;
+  }
+
+  if (inventory.totalSkipped > 0) {
+    console.error(`❌ Gate Failure: ${inventory.totalSkipped} skipped tests detected (threshold: 0)!`);
+    failedGate = true;
+  }
+
+  if (inventory.totalCollectedTests !== inventory.tests.length) {
+    console.error(
+      `❌ Gate Failure: Vitest collected test count (${inventory.totalCollectedTests}) differs from inventory test list length (${inventory.tests.length})!`
+    );
+    failedGate = true;
+  }
+
+  for (const req of REQUIRED_SUBSYSTEMS) {
+    const subsystemTests = inventory.tests.filter((t) => t.subsystem === req);
+    if (subsystemTests.length === 0) {
+      console.error(`❌ Gate Failure: Required subsystem '${req}' has 0 collected tests!`);
+      failedGate = true;
+    }
+  }
+
+  if (failedGate) {
+    console.error("❌ Step 4: Verification Gates FAILED!");
+    process.exit(1);
+  }
+  console.log("✓ Step 4: Verification Gates PASSED\n");
+
+  // Step 5: TypeScript Typecheck & Lint
+  console.log("=== STEP 5: TypeScript Typecheck & Lint (pnpm lint) ===");
+  try {
+    const lintOutput = execFileSync("pnpm", ["lint"], {
+      cwd: root,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
+      windowsHide: true
+    });
+    console.log(lintOutput);
+    console.log("✓ Step 5: TypeScript Typecheck PASSED\n");
+  } catch (err: any) {
+    console.error("❌ Step 5: TypeScript Typecheck FAILED");
+    console.error(err.stdout || err.stderr || err.message);
+    process.exit(1);
+  }
+
+  // Step 6: Git Whitespace Integrity Check
+  console.log("=== STEP 6: Git Whitespace Integrity Check (git diff --check) ===");
+  try {
+    execFileSync("git", ["diff", "--check"], {
+      cwd: root,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
+      windowsHide: true
+    });
+    console.log("✓ Step 6: Git Whitespace Check PASSED\n");
+  } catch (err: any) {
+    console.error("❌ Step 6: Git Whitespace Check FAILED");
+    console.error(err.stdout || err.stderr || err.message);
+    process.exit(1);
+  }
+
   console.log("=========================================");
-
-  runStep("1. Workspace Build", "pnpm build");
-  runStep("2. Subsystem Test Suite Execution", "pnpm test");
-  runStep("3. TypeScript Typecheck & Lint", "pnpm lint");
-  runStep("4. Git Whitespace Integrity Check", "git diff --check");
-
-  console.log("\n=== 5. AUTHORITATIVE TEST INVENTORY REPORT ===");
-  const inventory = buildTestInventory();
-  console.log(`Total Test Files:   ${inventory.totalFiles}`);
-  console.log(`Total Active Tests:  ${inventory.totalActiveTests}`);
-  console.log(`Total Skipped Tests: ${inventory.totalSkippedTests}`);
-  console.log(`Covered Subsystems:  ${inventory.subsystems.join(", ")}`);
-
-  console.log("\n=========================================");
   console.log(" ALL VERIFICATION CHECKS PASSED CLEANLY!");
   console.log("=========================================");
 }
 
-main();
+runVerification();

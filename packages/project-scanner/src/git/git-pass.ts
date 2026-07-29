@@ -97,11 +97,12 @@ export class GitPass implements ScannerPass {
             timeout: this.config.gitTimeoutMs,
             maxBuffer: 1024 * 1024,
             windowsHide: true,
+            stdio: ["pipe", "pipe", "pipe"],
             encoding: "utf-8"
           });
           return { stdout: stdout?.trim() ?? "", exitCode: 0 };
         } catch (err: any) {
-          return { stdout: err.stdout?.toString()?.trim() ?? "", exitCode: err.code ?? 1 };
+          return { stdout: err.stdout?.toString()?.trim() ?? "", exitCode: err.status ?? err.code ?? 1 };
         }
       };
 

@@ -324,9 +324,12 @@ describe("Milestone 3 — Evidence-Backed Multi-Pass Repository Scanner", () => 
     fs.writeFileSync(path.join(tmpDir, "index.js"), "console.log('git repo');");
 
     try {
-      execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, stdio: "ignore" });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, stdio: "ignore" });
+      execFileSync("git", ["init", "-b", "main"], { cwd: tmpDir, stdio: "pipe" });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, stdio: "pipe" });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, stdio: "pipe" });
+      execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "pipe" });
+      execFileSync("git", ["commit", "-m", "initial commit"], { cwd: tmpDir, stdio: "pipe" });
+      fs.writeFileSync(path.join(tmpDir, "dirty.js"), "console.log('dirty');");
     } catch {
       return; // Git CLI not available in test environment
     }
