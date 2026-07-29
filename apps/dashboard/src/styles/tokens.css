@@ -1,0 +1,137 @@
+/* tokens.css - Design System Tokens */
+:root {
+  /* Color Palette - Dark Mode First */
+  --ds-color-bg-base: #090d16;
+  --ds-color-bg-subtle: #0f172a;
+  --ds-color-bg-surface: #172033;
+  --ds-color-bg-surface-hover: #1e293b;
+  --ds-color-bg-surface-active: #27354e;
+  --ds-color-bg-elevated: #1e293b;
+  --ds-color-bg-elevated-hover: #2d3d59;
+
+  --ds-color-border-subtle: #1e293b;
+  --ds-color-border-default: #334155;
+  --ds-color-border-strong: #475569;
+  --ds-color-border-focus: #38bdf8;
+
+  --ds-color-fg-default: #f8fafc;
+  --ds-color-fg-muted: #94a3b8;
+  --ds-color-fg-subtle: #64748b;
+  --ds-color-fg-disabled: #475569;
+
+  --ds-color-accent: #0284c7;
+  --ds-color-accent-hover: #0369a1;
+  --ds-color-accent-subtle: rgba(2, 132, 199, 0.15);
+  --ds-color-accent-fg: #38bdf8;
+
+  /* Semantic State Colors & Backgrounds */
+  --ds-color-success-bg: rgba(16, 185, 129, 0.12);
+  --ds-color-success-border: #059669;
+  --ds-color-success-fg: #34d399;
+
+  --ds-color-warning-bg: rgba(245, 158, 11, 0.12);
+  --ds-color-warning-border: #d97706;
+  --ds-color-warning-fg: #fbbf24;
+
+  --ds-color-danger-bg: rgba(239, 68, 68, 0.12);
+  --ds-color-danger-border: #dc2626;
+  --ds-color-danger-fg: #f87171;
+
+  --ds-color-unresolved-bg: rgba(100, 116, 139, 0.15);
+  --ds-color-unresolved-border: #64748b;
+  --ds-color-unresolved-fg: #cbd5e1;
+
+  --ds-color-observed-bg: rgba(14, 165, 233, 0.12);
+  --ds-color-observed-border: #0284c7;
+  --ds-color-observed-fg: #38bdf8;
+
+  --ds-color-inferred-bg: rgba(168, 85, 247, 0.12);
+  --ds-color-inferred-border: #9333ea;
+  --ds-color-inferred-fg: #c084fc;
+
+  --ds-color-proposed-bg: rgba(59, 130, 246, 0.12);
+  --ds-color-proposed-border: #2563eb;
+  --ds-color-proposed-fg: #60a5fa;
+
+  --ds-color-approved-bg: rgba(16, 185, 129, 0.15);
+  --ds-color-approved-border: #10b981;
+  --ds-color-approved-fg: #34d399;
+
+  --ds-color-active-bg: rgba(14, 165, 233, 0.15);
+  --ds-color-active-border: #0ea5e9;
+  --ds-color-active-fg: #38bdf8;
+
+  --ds-color-failed-bg: rgba(239, 68, 68, 0.15);
+  --ds-color-failed-border: #ef4444;
+  --ds-color-failed-fg: #f87171;
+
+  /* Typography */
+  --ds-font-family-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --ds-font-family-mono: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+
+  --ds-font-size-xs: 0.75rem;     /* 12px */
+  --ds-font-size-sm: 0.875rem;    /* 14px */
+  --ds-font-size-md: 1rem;        /* 16px */
+  --ds-font-size-lg: 1.125rem;    /* 18px */
+  --ds-font-size-xl: 1.25rem;     /* 20px */
+  --ds-font-size-2xl: 1.5rem;     /* 24px */
+
+  --ds-font-weight-regular: 400;
+  --ds-font-weight-medium: 500;
+  --ds-font-weight-semibold: 600;
+  --ds-font-weight-bold: 700;
+
+  --ds-line-height-tight: 1.25;
+  --ds-line-height-normal: 1.5;
+  --ds-line-height-relaxed: 1.625;
+
+  /* Spacing System */
+  --ds-space-1: 0.25rem;  /* 4px */
+  --ds-space-2: 0.5rem;   /* 8px */
+  --ds-space-3: 0.75rem;  /* 12px */
+  --ds-space-4: 1rem;     /* 16px */
+  --ds-space-5: 1.25rem;  /* 20px */
+  --ds-space-6: 1.5rem;   /* 24px */
+  --ds-space-8: 2rem;     /* 32px */
+  --ds-space-10: 2.5rem;  /* 40px */
+  --ds-space-12: 3rem;    /* 48px */
+
+  /* Radii */
+  --ds-radius-none: 0px;
+  --ds-radius-sm: 2px;
+  --ds-radius-md: 4px;
+  --ds-radius-lg: 6px;
+  --ds-radius-full: 9999px;
+
+  /* Elevation & Shadows */
+  --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --ds-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --ds-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+
+  /* Z-Index Hierarchy */
+  --ds-z-base: 0;
+  --ds-z-dropdown: 1000;
+  --ds-z-sticky: 1100;
+  --ds-z-overlay: 1200;
+  --ds-z-modal: 1300;
+  --ds-z-drawer: 1400;
+  --ds-z-tooltip: 1500;
+
+  /* Motion & Animation */
+  --ds-motion-duration-fast: 100ms;
+  --ds-motion-duration-normal: 200ms;
+  --ds-motion-duration-slow: 300ms;
+  --ds-motion-ease-default: cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Focus Ring */
+  --ds-focus-ring: 0 0 0 2px var(--ds-color-bg-base), 0 0 0 4px var(--ds-color-border-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-motion-duration-fast: 0ms;
+    --ds-motion-duration-normal: 0ms;
+    --ds-motion-duration-slow: 0ms;
+  }
+}
